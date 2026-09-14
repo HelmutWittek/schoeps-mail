@@ -37,8 +37,12 @@ MIN_ANTEIL = float(os.getenv("REGEL_MIN_ANTEIL", "0.8"))
 # schon. Trennt sich ueber die Zahlen: 95 % bei mindestens 20 gewichteten
 # Mails erreicht kein Mensch, ein Automat immer. Trockenlauf 2026-09-14: 269 der
 # 821 Zendesk-Mails kamen von drei schoeps.de-Adressen und fielen bis zur KI durch.
+# Gemessen: die Marke '[Schoeps Mikrofone]' liegt zu 95,1 % im Zendesk-Ordner
+# (784 gewichtete Mails, der Rest von Hand in Themenordner gezogen) — bei 0.95
+# kippte die Entscheidung je nach ausgeblendeter Mail. Deshalb 0.9: bei >= 20
+# Mails trennt das immer noch Automat von Mensch (sales@schoeps.de liegt bei 70 %).
 MIN_EVIDENZ_STRENG = float(os.getenv("REGEL_MIN_EVIDENZ_STRENG", "20"))
-MIN_ANTEIL_STRENG = float(os.getenv("REGEL_MIN_ANTEIL_STRENG", "0.95"))
+MIN_ANTEIL_STRENG = float(os.getenv("REGEL_MIN_ANTEIL_STRENG", "0.9"))
 
 EIGENE_DOMAINS = {
     d.strip().lower() for d in os.getenv("EIGENE_DOMAINS", "schoeps.de").split(",") if d.strip()
