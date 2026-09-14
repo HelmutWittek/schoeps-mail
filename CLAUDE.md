@@ -60,10 +60,19 @@ oeffentlich), `.env` dort (chmod 600), DB `schoepsmail` mit Rolle `schoepsmail` 
   Rollup jetzt nur VOR der Anbieter-Ebene, `schoeps.zendesk.com` darf entscheiden.
   Einmal `400 Invalid request data` von Anthropic bei einer Mail — Ursache offen
   (vermutlich Inhalt), bei der Wiederholung beobachten.
-- **Access Policy:** per Graph auch 70 Minuten nach `New-ApplicationAccessPolicy`
-  noch 200 auf das Kollegen-Postfach, obwohl `Test-ApplicationAccessPolicy`
-  „Abgelehnt" sagt. Vor Phase 2 klaeren (`Get-ApplicationAccessPolicy`, ggf.
-  Scope ueber eine E-Mail-aktivierte Sicherheitsgruppe statt Nutzer).
+- **Access Policy greift nur halb (Stand 17:20, 95 min nach Anlage):** auf das
+  Kollegen-Postfach liefert `/calendarView` **403** (Policy wirkt), aber
+  `/messages` und `/mailFolders` weiter **200**. `Test-ApplicationAccessPolicy`
+  sagt „Abgelehnt". Also kein Konfigurationsfehler am Scope, sondern die
+  Mail-Seite zieht nicht nach — entweder langsamere Propagation oder eine
+  Luecke des alten Mechanismus. Naechste Schritte, vor Phase 2: am Folgetag
+  `scripts/graph_policy_wait.py` erneut; bleibt es bei 200, auf **RBAC for
+  Applications** umstellen (Exchange Online: `New-ServicePrincipal`,
+  `New-ManagementScope` auf das Postfach, `New-ManagementRoleAssignment -App …
+  -Role "Application Mail.ReadWrite" -CustomResourceScope …`, danach die
+  Graph-Application-Permission `Mail.ReadWrite` in Entra ENTFERNEN — bei RBAC
+  autorisiert Exchange, nicht Graph). Bis dahin gilt: der Worker liest nur
+  `/users/wittek@schoeps.de`, die technische Sperre fehlt fuer Mail.
 
 Sprache: Antworten, Kommentare und Docstrings auf Deutsch, knapp. Keine
 Aufwandsschaetzungen in Stunden oder Tagen (Umfang und Risiko nennen, Laufzeit
