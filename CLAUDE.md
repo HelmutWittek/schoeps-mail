@@ -58,6 +58,23 @@ oeffentlich), `.env` dort (chmod 600), DB `schoepsmail` mit Rolle `schoepsmail` 
   Entscheidung je nach ausgeblendeter Mail, deshalb 0.9. **SQL-Falle dabei:** der
   Regex `(?:AW|RE…` im `text()`-Statement wurde als Bind-Parameter `:AW` gelesen —
   Doppelpunkte im SQL als `\:` escapen, der Ausdruck muss buchstabengleich zum Index sein.
+- **KI-Stufe gezielt gemessen (`--nur-ki`, 84 Mails, die Stufe 1–3 offen lassen,
+  gleiche Stichprobe fuer beide Modelle):** Haiku `sicher` 71 Entscheidungen,
+  **66 %** richtig (0,12 USD); Sonnet 5 (`effort: low`) `sicher` 63, **76 %**
+  richtig, 18 `unsicher` (0,15 USD). Beide unter dem 90-%-Ziel — aber die
+  Fehlgriffe sind zu einem grossen Teil **Konventionen, die nicht in der Mail
+  stehen**: Bahn- und Hotelbuchungen liegen bei Helmut im Ordner der Veranstaltung
+  (`VDT/TMT 2025`, `sonst./JTSE`), nicht in `Reisen, Bahn`; GitHub-Belege liegen
+  historisch in DREI Ordnern (`IT`, `Software`, `AI, Automation`) — da gibt es kein
+  „richtig"; Eltern/Kind (`Bekannte, Branche` vs. `…/Promi Users`, `AES` vs.
+  `AES/German Section`) und Partner-vs-Produkt (`Illusonic` vs. `SuperCMIT`). Der
+  gebaute Hebel dafuer sind die **handgeschriebenen Profile** („Reisen, Bahn: nur
+  Buchungen ohne Veranstaltungsbezug") — Phase 4 macht sie editierbar. Haiku hat
+  6x einen **nicht existierenden Pfad** erfunden (`Posteingang/Slite` statt
+  `Posteingang/Redmine, Planio, Slite`) — wird als unsicher gezaehlt, nie bewegt.
+  Gesamtbild mit 200er-Zufallsstichprobe: Stufe 1–3 decken 92 % ab, die KI den
+  Rest; **Gesamtpraezision 97,5 % (Haiku) bzw. 98,4 % (Sonnet)** bei 96–98 %
+  Abdeckung. Einmal `500 Internal server error` je Lauf (transient).
 - **Trockenlauf mit KI, 200 Mails — abgebrochen durch leeres Anthropic-Guthaben**
   (`credit balance is too low`, nach ~50 Mails; derselbe Key wie LifeOS, dessen
   Extraktor/Spiegel/Urteile/Briefing damit ebenfalls stehen, bis aufgeladen ist).
