@@ -9,7 +9,7 @@ import asyncio
 import logging
 import os
 
-from src import index
+from src import index, llm, profil
 from src.graph import Graph
 from src.heartbeat import record_failure, record_success
 
@@ -24,6 +24,13 @@ DRY_RUN = os.getenv("DRY_RUN", "1") != "0"
 async def zyklus(graph: Graph) -> int:
     ordner = await index.spiegle_ordner(graph)
     neu, weg = await index.sync_mails(graph, ordner)
+    # Profile auffrischen, wenn faellig (profil.py prueft PROFIL_TAGE selbst;
+    # im Normalfall ist hier nichts zu tun und es kostet eine Abfrage).
+    if llm.aktiv():
+        try:
+            await profil.profil_lauf()
+        except Exception:  # noqa: BLE001 — Profile sind Komfort, kein Muss
+            log.exception("Profil-Lauf fehlgeschlagen")
     return neu + weg
 
 
