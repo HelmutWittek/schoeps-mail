@@ -192,7 +192,17 @@ noch aus** — Phase 1 liest nur und verschiebt nichts, darf also laufen.
   Trockenlauf nur Thread: **2.076 von 7.762 (27 %)** finden ihren Ordner ueber den
   Thread (441 → Einladungen, 168 → Buchhaltung, 116 → Vertriebspartner …), 5.686
   brauchen das Thema (Haiku, Groessenordnung 15–20 USD fuer den ganzen Bestand).
-  **Noch nicht ausgefuehrt — braucht Helmuts Go nach der KI-Messung.**
+  **Ausgefuehrt 2026-09-14 abends, Weg 1 (nur Thread + Statistik, keine KI), Go von
+  Helmut:** Pilot 60 Mails (17 bewegt, per Graph gegengeprueft: Zielordner und
+  Kategorie `auto-thread` stimmen), dann voller Lauf ueber 7.745 Mails: **2.305
+  bewegt** (1.924 Thread, 377 Adresse, 4 Domain), **0 Fehler**, 597 nach
+  `Einladungen`, 192 nach `Buchhaltung, Verwaltung`, 115 nach `Vertriebspartner,
+  Händler`. **5.457 bleiben in `SCHOEPS intern`** und warten auf die KI-Verteilung
+  (Weg 2 nach Phase 4, wenn Profile wie „Reisen, Bahn" von Hand geschaerft sind).
+  Beobachtung: `adresse` stieg von 41 (Trockenlauf) auf 377, weil bewegte Mails
+  sofort als Evidenz (Gewicht 1) zaehlen und ab zwei Mails desselben Absenders eine
+  Regel bilden — gewollte Rueckkopplung, bei Thread-Qualitaet 97 % vertretbar.
+  Jede Bewegung steht in `regel_entscheidung` (`ausgefuehrt = true`).
 - **Unklares bleibt in `Posteingang/Move`.** Kein Unbekannt-Ordner. Der
   Worker bewertet liegengebliebene Mails bei jedem Lauf neu; sobald der
   Absender Historie hat (Helmut sortiert von Hand), greift die Regel.
