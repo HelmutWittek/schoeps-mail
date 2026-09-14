@@ -1,0 +1,11 @@
+# Geheimnisse liegen nie im Repo: Secret und Tokens kommen ueber die .env auf dem VPS.
+.env
+*.env
+*.token
+*_secret*
+*token*.txt
+
+__pycache__/
+*.pyc
+.venv/
+*.log
