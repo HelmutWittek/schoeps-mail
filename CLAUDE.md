@@ -46,6 +46,18 @@ oeffentlich), `.env` dort (chmod 600), DB `schoepsmail` mit Rolle `schoepsmail` 
   kein Fehler der Stufe, sondern ein **Konflikt zwischen alter Praxis und neuer
   Regel**; offen ist, ob `SCHOEPS intern` (und andere Posteingang-Sammelordner) aus
   der Thread-Evidenz ausgenommen werden soll — Entscheidung Helmut.
+- **Nach der SCHOEPS-intern-Entscheidung (Sammelordner raus aus Evidenz und
+  Stichprobe), 500 Mails ohne KI:** Adresse 422 / **99,1 %**, Domain 5 / 100 %,
+  Thread 33 / **97,0 %**, 40 unklar → **92 % wuerden bewegt, 98,9 % davon richtig.**
+  Dazu zwei neue Regeln in Stufe 1, beide aus Zendesk-Fehlgriffen: (a) Absender der
+  EIGENEN Domain duerfen entscheiden, wenn sie Systemadressen sind (>= 20 gewichtete
+  Mails, >= 90 % in einem Ordner — `MIN_*_STRENG`; `sales@schoeps.de` liegt bei 70 %
+  und faellt korrekt durch); (b) **Betreff-Marke** `[Schoeps Mikrofone] #…`
+  (`betreff_tag`, Migration 002 haengt `betreff` an die Sicht + Ausdrucks-Index):
+  784 gewichtete Mails, 95,1 % im Zendesk-Ordner — bei Schwelle 0.95 kippte die
+  Entscheidung je nach ausgeblendeter Mail, deshalb 0.9. **SQL-Falle dabei:** der
+  Regex `(?:AW|RE…` im `text()`-Statement wurde als Bind-Parameter `:AW` gelesen —
+  Doppelpunkte im SQL als `\:` escapen, der Ausdruck muss buchstabengleich zum Index sein.
 - **Trockenlauf mit KI, 200 Mails — abgebrochen durch leeres Anthropic-Guthaben**
   (`credit balance is too low`, nach ~50 Mails; derselbe Key wie LifeOS, dessen
   Extraktor/Spiegel/Urteile/Briefing damit ebenfalls stehen, bis aufgeladen ist).
@@ -151,6 +163,19 @@ noch aus** — Phase 1 liest nur und verschiebt nichts, darf also laufen.
 
 ## Entscheidungen von Helmut
 
+- **Datenhaltung freigegeben (2026-09-14):** Metadaten + Vorschauen auf dem VPS,
+  volle Texte unklarer Mails zur Entscheidung an Anthropic.
+- **`Posteingang/SCHOEPS intern` ist kein bevorzugter Zielordner (2026-09-14).**
+  Die 7.762 Mails darin sollen nach 1. Thread und 2. Thema auf die Themenordner
+  verteilt werden. Umgesetzt: `SAMMELORDNER_PFADE` in `index.py` macht ihn (und
+  seinen Unterordner `Done`) zum Arbeitsordner — weiter synchronisiert, aber
+  weder Ziel noch Evidenz; `scripts/intern_verteilen.py` verteilt den Bestand
+  (Trockenlauf als Default, `--ausfuehren` bewegt mit auto-Kategorie und zieht den
+  Index sofort nach, juengste Mail je Thread zuerst, damit sie den Rest nachzieht).
+  Trockenlauf nur Thread: **2.076 von 7.762 (27 %)** finden ihren Ordner ueber den
+  Thread (441 → Einladungen, 168 → Buchhaltung, 116 → Vertriebspartner …), 5.686
+  brauchen das Thema (Haiku, Groessenordnung 15–20 USD fuer den ganzen Bestand).
+  **Noch nicht ausgefuehrt — braucht Helmuts Go nach der KI-Messung.**
 - **Unklares bleibt in `Posteingang/Move`.** Kein Unbekannt-Ordner. Der
   Worker bewertet liegengebliebene Mails bei jedem Lauf neu; sobald der
   Absender Historie hat (Helmut sortiert von Hand), greift die Regel.

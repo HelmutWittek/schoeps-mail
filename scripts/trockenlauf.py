@@ -45,9 +45,29 @@ async def stichprobe(n: int, monate: int, seed: float) -> list[dict]:
         return [dict(row._mapping) for row in r.fetchall()]
 
 
-async def main(n: int, monate: int, mit_ki: bool, seed: float, zeige: int) -> None:
-    mails = await stichprobe(n, monate, seed)
-    print(f"Stichprobe: {len(mails)} Mails aus den letzten {monate} Monaten, KI={'an' if mit_ki else 'aus'}")
+async def nur_ki_faelle(n: int, monate: int, seed: float) -> list[dict]:
+    """Nur Mails, die Stufe 1–3 NICHT entscheiden — misst die KI-Stufe gezielt.
+
+    Seit Stufe 1–3 92 % abdecken, liefert eine Zufallsstichprobe von 200 nur
+    ~15 KI-Entscheidungen; das ist keine Messung. Hier wird ein groesserer Pool
+    gezogen und ohne KI vorentschieden, behalten wird, was offen bleibt.
+    """
+    pool = await stichprobe(n * 12, monate, seed)
+    aus: list[dict] = []
+    for m in pool:
+        async with get_session() as s:
+            e = await kaskade.entscheide(s, m, None, ohne_mail_id=m["id"], mit_ki=False)
+        if e["stufe"] == "unklar":
+            aus.append(m)
+        if len(aus) >= n:
+            break
+    return aus
+
+
+async def main(n: int, monate: int, mit_ki: bool, seed: float, zeige: int, nur_ki: bool = False) -> None:
+    mails = await (nur_ki_faelle(n, monate, seed) if nur_ki else stichprobe(n, monate, seed))
+    print(f"Stichprobe: {len(mails)} Mails aus den letzten {monate} Monaten, KI={'an' if mit_ki else 'aus'}"
+          f"{', nur Faelle ohne Stufe-1-3-Entscheidung' if nur_ki else ''}")
     graph = Graph() if mit_ki else None
     je_stufe: dict[str, Counter] = defaultdict(Counter)
     fehler: list[tuple[str, str, str, str]] = []
@@ -108,5 +128,6 @@ if __name__ == "__main__":
     p.add_argument("--ohne-ki", action="store_true")
     p.add_argument("--seed", type=float, default=0.42)
     p.add_argument("--zeige", type=int, default=30)
+    p.add_argument("--nur-ki", action="store_true", help="nur Mails, die Stufe 1-3 nicht entscheiden")
     a = p.parse_args()
-    asyncio.run(main(a.n, a.monate, not a.ohne_ki, a.seed, a.zeige))
+    asyncio.run(main(a.n, a.monate, not a.ohne_ki, a.seed, a.zeige, a.nur_ki))

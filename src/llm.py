@@ -41,13 +41,21 @@ async def frage_json(system: str, nutzer: str, schema: dict[str, Any],
     if not aktiv():
         log.warning("ANTHROPIC_API_KEY fehlt — LLM-Stufe aus")
         return None
+    # Sonnet 5 / Opus 5 denken standardmaessig (adaptiv), und die Denk-Tokens
+    # zaehlen auf max_tokens — mit 300 kam im A/B-Test dreimal abgeschnittenes
+    # JSON ('{"p'). Deshalb Budget hoch und `effort: low` fuer alles ausser Haiku
+    # (Haiku 4.5 kennt `effort` nicht und denkt ohne budget_tokens nicht).
+    output_config: dict[str, Any] = {"format": {"type": "json_schema", "schema": schema}}
+    if "haiku" not in MODELL:
+        output_config["effort"] = "low"
+        max_tokens = max(max_tokens, 4000)
     try:
         r = await _klient().messages.create(
             model=MODELL,
             max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": nutzer}],
-            output_config={"format": {"type": "json_schema", "schema": schema}},
+            output_config=output_config,
         )
     except anthropic.RateLimitError as exc:
         log.warning("Anthropic 429: %s", exc)
@@ -64,6 +72,9 @@ async def frage_json(system: str, nutzer: str, schema: dict[str, Any],
         return None
     if r.stop_reason == "refusal":
         log.warning("Anthropic hat die Anfrage abgelehnt")
+        return None
+    if r.stop_reason == "max_tokens":
+        log.error("Antwort abgeschnitten (max_tokens=%d, Modell %s)", max_tokens, MODELL)
         return None
     text = next((b.text for b in r.content if b.type == "text"), None)
     if not text:
