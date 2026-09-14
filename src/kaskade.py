@@ -36,7 +36,8 @@ async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None 
                      ordnerliste: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """`mail` braucht: id, von_adresse, von_domain, conversation_id, betreff, vorschau, an, von_name."""
     # Stufe 1
-    t = await regel.entscheide_statistik(s, mail.get("von_adresse"), mail.get("von_domain"), ohne_mail_id)
+    t = await regel.entscheide_statistik(s, mail.get("von_adresse"), mail.get("von_domain"),
+                                         ohne_mail_id, betreff=mail.get("betreff"))
     if t:
         return {**t, "sicherheit": "sicher", "kandidaten": []}
 

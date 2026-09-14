@@ -53,7 +53,11 @@ async def frage_json(system: str, nutzer: str, schema: dict[str, Any],
         log.warning("Anthropic 429: %s", exc)
         return None
     except anthropic.APIStatusError as exc:
-        log.error("Anthropic %s: %s", exc.status_code, exc.message)
+        # Bei 400 den Anlass mitloggen: im Trockenlauf kam je Lauf einmal
+        # 'Invalid request data' ohne erkennbaren Grund — Laenge und Anfang des
+        # Nutzertexts helfen, das Muster zu finden.
+        log.error("Anthropic %s: %s | nutzer_len=%d anfang=%r", exc.status_code, exc.message,
+                  len(nutzer), nutzer[:160])
         return None
     except anthropic.APIConnectionError as exc:
         log.warning("Anthropic nicht erreichbar: %s", exc)

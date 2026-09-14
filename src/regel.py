@@ -22,6 +22,7 @@ Das Gewicht kommt aus `mail_evidenz`: handsortiert 2, vom Automaten abgelegt
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from sqlalchemy import text
@@ -29,6 +30,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 MIN_EVIDENZ = float(os.getenv("REGEL_MIN_EVIDENZ", "2"))
 MIN_ANTEIL = float(os.getenv("REGEL_MIN_ANTEIL", "0.8"))
+
+# Strenge Schwellen fuer Absender der EIGENEN Domain und fuer Betreff-Marken:
+# ein Kollege schreibt zu vielen Themen und soll hier nie entscheiden — eine
+# Systemadresse (Zendesk-Benachrichtigungen ueber support@schoeps.de) aber
+# schon. Trennt sich ueber die Zahlen: 95 % bei mindestens 20 gewichteten
+# Mails erreicht kein Mensch, ein Automat immer. Trockenlauf 2026-09-14: 269 der
+# 821 Zendesk-Mails kamen von drei schoeps.de-Adressen und fielen bis zur KI durch.
+MIN_EVIDENZ_STRENG = float(os.getenv("REGEL_MIN_EVIDENZ_STRENG", "20"))
+MIN_ANTEIL_STRENG = float(os.getenv("REGEL_MIN_ANTEIL_STRENG", "0.95"))
 
 EIGENE_DOMAINS = {
     d.strip().lower() for d in os.getenv("EIGENE_DOMAINS", "schoeps.de").split(",") if d.strip()
@@ -139,18 +149,52 @@ async def _verteilung(s: AsyncSession, bedingung: str, params: dict[str, Any]
     return [(row[0], row[1], float(row[2])) for row in r.fetchall()]
 
 
-async def nach_adresse(s: AsyncSession, adresse: str, ohne_mail_id: str | None = None
-                       ) -> dict[str, Any] | None:
+async def nach_adresse(s: AsyncSession, adresse: str, ohne_mail_id: str | None = None,
+                       streng: bool = False) -> dict[str, Any] | None:
     adresse = (adresse or "").strip().lower()
     if not adresse or "@" not in adresse:
         return None
     zeilen = await _verteilung(s, "von_adresse = :a", {"a": adresse, "ohne": ohne_mail_id})
-    t = auswerten(zeilen)
+    t = (auswerten(zeilen, MIN_ANTEIL_STRENG, MIN_EVIDENZ_STRENG) if streng else auswerten(zeilen))
     if not t:
         return None
     return {**t, "stufe": "adresse", "schluessel": adresse,
             "begruendung": f"{t['treffer']:g} von {t['gesamt']:g} gewichteten Mails von "
-                           f"{adresse} liegen in {t['ziel_pfad']}"}
+                           f"{adresse} liegen in {t['ziel_pfad']}" + (" (Systemadresse)" if streng else "")}
+
+
+_TAG = re.compile(r"^\s*(?:(?:AW|RE|WG|FW|FWD|Antwort|Zugesagt|Abgelehnt|Angenommen)\s*:\s*)*(\[[^\]]{2,60}\])")
+
+
+def betreff_tag(betreff: str | None) -> str | None:
+    """Fuehrende eckige Marke im Betreff: '[Schoeps Mikrofone] #64814: …' -> '[schoeps mikrofone]'.
+
+    Ticket- und Projektsysteme (Zendesk, Redmine, Asana) kennzeichnen jede Mail
+    so, waehrend Absender-Adresse und Domain wechseln koennen. Antwort-Praefixe
+    davor werden ueberlesen. Kein Tag -> None.
+    """
+    if not betreff:
+        return None
+    m = _TAG.match(betreff)
+    return m.group(1).strip().lower() if m else None
+
+
+async def nach_betreff_tag(s: AsyncSession, betreff: str | None, ohne_mail_id: str | None = None
+                           ) -> dict[str, Any] | None:
+    """Stufe 1b: wohin gingen bisher Mails mit derselben Betreff-Marke? Strenge Schwellen."""
+    tag = betreff_tag(betreff)
+    if not tag:
+        return None
+    zeilen = await _verteilung(
+        s, "lower(substring(betreff FROM '^\\s*(?:(?:AW|RE|WG|FW|FWD|Antwort|Zugesagt|Abgelehnt|Angenommen)\\s*:\\s*)*(\\[[^\\]]{2,60}\\])')) = :tag",
+        {"tag": tag, "ohne": ohne_mail_id},
+    )
+    t = auswerten(zeilen, MIN_ANTEIL_STRENG, MIN_EVIDENZ_STRENG)
+    if not t:
+        return None
+    return {**t, "stufe": "adresse", "schluessel": tag,
+            "begruendung": f"{t['treffer']:g} von {t['gesamt']:g} gewichteten Mails mit Betreff-Marke "
+                           f"{tag} liegen in {t['ziel_pfad']}"}
 
 
 async def nach_domain(s: AsyncSession, domain: str, ohne_mail_id: str | None = None
@@ -177,13 +221,22 @@ async def nach_domain(s: AsyncSession, domain: str, ohne_mail_id: str | None = N
 
 
 async def entscheide_statistik(s: AsyncSession, von_adresse: str | None, von_domain: str | None,
-                               ohne_mail_id: str | None = None) -> dict[str, Any] | None:
-    """Stufe 1 komplett: Adresse, dann Domain. Eigene Domains ueberspringen beides."""
+                               ohne_mail_id: str | None = None, betreff: str | None = None
+                               ) -> dict[str, Any] | None:
+    """Stufe 1 komplett: Adresse, Betreff-Marke, Domain.
+
+    Eigene Domains: nur die strenge Adress-Regel (Systemadressen) und die
+    Betreff-Marke — nie die Domain, nie die lockere Adress-Statistik.
+    """
     if not von_adresse:
         return None
-    if von_domain and ist_eigene(von_domain):
-        return None
-    t = await nach_adresse(s, von_adresse, ohne_mail_id)
+    eigene = bool(von_domain and ist_eigene(von_domain))
+    t = await nach_adresse(s, von_adresse, ohne_mail_id, streng=eigene)
     if t:
         return t
+    t = await nach_betreff_tag(s, betreff, ohne_mail_id)
+    if t:
+        return t
+    if eigene:
+        return None
     return await nach_domain(s, von_domain or von_adresse.split("@", 1)[-1], ohne_mail_id)

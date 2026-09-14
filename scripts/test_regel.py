@@ -42,6 +42,15 @@ pruefe(regel.regel_kandidaten("gmail.com") == [], "Anbieter selbst: keine Kandid
 pruefe(regel.regel_kandidaten("news.sennheiser.com") == ["news.sennheiser.com", "sennheiser.com"],
        "normale Domain rollt voll")
 
+# Betreff-Marke
+pruefe(regel.betreff_tag("[Schoeps Mikrofone] #64814: ORTF 3D Cable issues") == "[schoeps mikrofone]",
+       "Marke am Betreffanfang")
+pruefe(regel.betreff_tag("AW: [Schoeps Mikrofone] #64694: AW: Genelec 3D mic rig") == "[schoeps mikrofone]",
+       "Antwort-Praefix vor der Marke wird ueberlesen")
+pruefe(regel.betreff_tag("WG: Re: [Redmine #123] Aufgabe") == "[redmine #123]", "mehrere Praefixe")
+pruefe(regel.betreff_tag("Mikrofon Anfrage [dringend]") is None, "Marke nur am Anfang zaehlt")
+pruefe(regel.betreff_tag("") is None and regel.betreff_tag(None) is None, "leer -> None")
+
 # Auswertung
 Z = [("o1", "A", 8.0), ("o2", "B", 2.0)]
 pruefe(regel.auswerten(Z)["ziel_pfad"] == "A" and regel.auswerten(Z)["anteil"] == 0.8, "80 % reichen genau")
