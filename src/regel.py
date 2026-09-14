@@ -185,8 +185,12 @@ async def nach_betreff_tag(s: AsyncSession, betreff: str | None, ohne_mail_id: s
     tag = betreff_tag(betreff)
     if not tag:
         return None
+    # Doppelpunkte im Regex als `\:` escapen — SQLAlchemys text() liest `(?:AW`
+    # sonst als Bind-Parameter `:AW` (bekannte Falle, siehe LifeOS-CLAUDE.md).
+    # Der Ausdruck muss buchstabengleich mit dem Index aus Migration 002 sein.
     zeilen = await _verteilung(
-        s, "lower(substring(betreff FROM '^\\s*(?:(?:AW|RE|WG|FW|FWD|Antwort|Zugesagt|Abgelehnt|Angenommen)\\s*:\\s*)*(\\[[^\\]]{2,60}\\])')) = :tag",
+        s, "lower(substring(betreff FROM '^\\s*(?\\:(?\\:AW|RE|WG|FW|FWD|Antwort|Zugesagt|Abgelehnt|Angenommen)"
+           "\\s*\\:\\s*)*(\\[[^\\]]{2,60}\\])')) = :tag",
         {"tag": tag, "ohne": ohne_mail_id},
     )
     t = auswerten(zeilen, MIN_ANTEIL_STRENG, MIN_EVIDENZ_STRENG)
