@@ -11,6 +11,7 @@ Namen — zu wenig Stoff, und das Modell wuerde raten.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any
@@ -24,7 +25,8 @@ log = logging.getLogger("schoepsmail.profil")
 
 PROFIL_TAGE = int(os.getenv("PROFIL_TAGE", "7"))
 MIN_MAILS = int(os.getenv("PROFIL_MIN_MAILS", "3"))
-MAX_JE_LAUF = int(os.getenv("PROFIL_MAX_JE_LAUF", "400"))
+MAX_JE_LAUF = int(os.getenv("PROFIL_MAX_JE_LAUF", "500"))
+PARALLEL = int(os.getenv("PROFIL_PARALLEL", "6"))
 
 SYSTEM = (
     "Du beschreibst E-Mail-Ordner eines Mitarbeiters der SCHOEPS Mikrofone GmbH "
@@ -98,25 +100,32 @@ async def profil_lauf(nur_fehlende: bool = False) -> int:
         kandidaten = [(row[0], row[1], row[2], int(row[3])) for row in r.fetchall()]
     if nur_fehlende:
         kandidaten = [k for k in kandidaten if k[2]]
-    geschrieben = 0
-    tokens_in = tokens_out = 0
-    for oid, pfad, _, n in kandidaten:
-        if n < MIN_MAILS:
-            profil = f"(nur {n} Mails — kein Profil, Ordnername: {pfad.rsplit('/', 1)[-1]})"
-        else:
+    zaehler = {"geschrieben": 0, "in": 0, "out": 0}
+    # Mehrere Ordner gleichzeitig: sequenziell dauerte der Erstlauf ueber 420
+    # Ordner fast eine Stunde, die Zeit steckt im LLM-Roundtrip, nicht in der DB.
+    schranke = asyncio.Semaphore(PARALLEL)
+
+    async def _einer(oid: str, pfad: str, n: int) -> None:
+        async with schranke:
+            if n < MIN_MAILS:
+                profil = f"(nur {n} Mails — kein Profil, Ordnername: {pfad.rsplit('/', 1)[-1]})"
+            else:
+                async with get_session() as s:
+                    st = await _stichprobe(s, oid)
+                antwort = await llm.frage_json(SYSTEM, _prompt(pfad, st), SCHEMA, max_tokens=400)
+                if not antwort:
+                    log.warning("Kein Profil fuer %s (LLM-Fehler)", pfad)
+                    return
+                zaehler["in"] += antwort["_tokens"]["in"]
+                zaehler["out"] += antwort["_tokens"]["out"]
+                profil = f"{antwort['hauptthema'].strip()} — {antwort['profil'].strip()}"
             async with get_session() as s:
-                st = await _stichprobe(s, oid)
-            antwort = await llm.frage_json(SYSTEM, _prompt(pfad, st), SCHEMA, max_tokens=400)
-            if not antwort:
-                log.warning("Kein Profil fuer %s (LLM-Fehler)", pfad)
-                continue
-            tokens_in += antwort["_tokens"]["in"]
-            tokens_out += antwort["_tokens"]["out"]
-            profil = f"{antwort['hauptthema'].strip()} — {antwort['profil'].strip()}"
-        async with get_session() as s:
-            await s.execute(text("""
-                UPDATE ordner SET profil = :p, profil_am = now() WHERE id = :id AND NOT profil_manuell
-            """), {"p": profil[:1200], "id": oid})
-        geschrieben += 1
-    log.info("Profile: %d geschrieben, Tokens in=%d out=%d", geschrieben, tokens_in, tokens_out)
-    return geschrieben
+                await s.execute(text("""
+                    UPDATE ordner SET profil = :p, profil_am = now() WHERE id = :id AND NOT profil_manuell
+                """), {"p": profil[:1200], "id": oid})
+            zaehler["geschrieben"] += 1
+
+    await asyncio.gather(*(_einer(oid, pfad, n) for oid, pfad, _, n in kandidaten))
+    log.info("Profile: %d geschrieben, Tokens in=%d out=%d",
+             zaehler["geschrieben"], zaehler["in"], zaehler["out"])
+    return zaehler["geschrieben"]
