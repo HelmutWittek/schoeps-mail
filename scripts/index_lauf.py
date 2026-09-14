@@ -17,6 +17,7 @@ from src.db import get_session
 from src.graph import Graph
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 async def kennzahlen() -> None:

@@ -14,6 +14,7 @@ from src.graph import Graph
 from src.heartbeat import record_failure, record_success
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)  # eine Zeile je Graph-Seite ist Rauschen
 log = logging.getLogger("schoepsmail.worker")
 
 POLL_SECONDS = int(os.getenv("POLL_SECONDS", "120"))
