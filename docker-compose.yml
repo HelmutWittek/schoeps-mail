@@ -1,0 +1,39 @@
+# Schoeps-Mail: ein Worker-Container, eigene Datenbank `schoepsmail` in der
+# Postgres-Instanz des LifeOS-Stacks (Container `lifeos-postgres`, erreichbar
+# als `postgres` im externen Netz `lifeos_default`). Keine Tabelle in `lifeos`.
+#
+# `.env` liegt neben dieser Datei (nicht im Repo): GRAPH_CLIENT_SECRET,
+# SCHOEPSMAIL_DB_PASSWORD, SLACK_BOT_TOKEN, ANTHROPIC_API_KEY.
+# Sonderzeichen in Single-Quotes, nie per `source` laden.
+services:
+  worker:
+    build: .
+    container_name: schoeps-mail-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://schoepsmail:${SCHOEPSMAIL_DB_PASSWORD}@postgres:5432/schoepsmail
+      GRAPH_TENANT_ID: ${GRAPH_TENANT_ID:-a4941ae5-fcbb-4e45-85f2-fcbc3d7d7079}
+      GRAPH_CLIENT_ID: ${GRAPH_CLIENT_ID:-1efdf29e-47c3-4f27-b423-50dadb4b48a3}
+      GRAPH_CLIENT_SECRET: ${GRAPH_CLIENT_SECRET}
+      GRAPH_SECRET_ABLAUF: ${GRAPH_SECRET_ABLAUF:-}
+      POSTFACH_UPN: ${POSTFACH_UPN:-wittek@schoeps.de}
+      EIGENE_DOMAINS: ${EIGENE_DOMAINS:-schoeps.de}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_KANAL: ${SLACK_KANAL:-C0C18020FN3}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Phase 1: nur lesen. Erst Phase 2 setzt DRY_RUN=0.
+      DRY_RUN: ${DRY_RUN:-1}
+      POLL_SECONDS: ${POLL_SECONDS:-120}
+      TZ: Europe/Berlin
+    volumes:
+      # Bind-Mounts wie bei LifeOS: ein `restart` reicht fuer Code-Aenderungen,
+      # kein Build noetig.
+      - ./src:/app/src:ro
+      - ./scripts:/app/scripts:ro
+      - ./migrations:/app/migrations:ro
+    networks:
+      - lifeos_default
+
+networks:
+  lifeos_default:
+    external: true
