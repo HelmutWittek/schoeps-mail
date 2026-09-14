@@ -51,6 +51,18 @@ ARBEITS_PFADE = {
     "Synchronisierungsprobleme", "Verlauf der Unterhaltung",
 }
 
+# Sammelordner, die der Nutzer aufloesen will (Entscheidung 2026-09-14):
+# `Posteingang/SCHOEPS intern` ist kein Ziel mehr und zaehlt nicht als Evidenz.
+# Kollegen-Post soll nach Thread und Thema in die Themenordner. Im Trockenlauf
+# waren 10 von 11 Thread-Fehlgriffen genau dieser Ordner — die Kaskade hatte
+# den Themenordner gewaehlt, die Historie sagte Sammelordner. Die Mails darin
+# werden weiter synchronisiert (fuer die Verteilung, `scripts/intern_verteilen.py`),
+# nur nicht mehr gewertet. Unterordner erben die Eigenschaft.
+SAMMELORDNER_PFADE = {
+    p.strip() for p in os.getenv("SAMMELORDNER_PFADE", "Posteingang/SCHOEPS intern").split("|") if p.strip()
+}
+ARBEITS_PFADE |= SAMMELORDNER_PFADE
+
 # Ordner, deren Mails gar nicht erst geholt werden: kein Nutzen fuer die
 # Entscheidung, aber viele Datensaetze. Gesendete und Junk werden geholt —
 # Gesendete beantwortet "hat Helmut je geantwortet", Junk "lag je im Junk".
