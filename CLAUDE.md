@@ -1,7 +1,69 @@
 # CLAUDE.md — Schoeps-Mail
 
 Mail-Automation fuer das Schoeps-Postfach `wittek@schoeps.de`. Stand 2026-09-14:
-Plan abgestimmt, Phase 0 (Zugang) erledigt, **Phase 1 noch nicht begonnen**.
+Plan abgestimmt, Phase 0 (Zugang) erledigt, **Phase 1 (Index + Messung) gebaut
+und auf dem VPS gelaufen** — Ergebnisse unter „Phase 1: Befund". Nichts wird
+bewegt (DRY_RUN=1), der Worker-Container ist noch nicht dauerhaft gestartet.
+
+## Was steht (Code)
+
+| Modul | Aufgabe |
+|---|---|
+| `src/graph.py` | Graph-Client: client_credentials, Retry-After, `IdType=ImmutableId` ueberall, Delta je Ordner (seitenweise), Move, Kategorien, Ordner anlegen, Mailtext holen |
+| `src/index.py` | Ordnerbaum spiegeln (Pfade, Arbeitsordner ueber Well-Known-Namen, Vererbung ausser `inbox`), Delta-Sync mit Commit je Seite; ein Ordnerfehler laesst die anderen durch, Zyklus gilt als gescheitert |
+| `src/regel.py` | Stufe 1: Adresse, Domain-Rollup, `MIN_EVIDENZ`=2, `MIN_ANTEIL`=0.8, eigene und Anbieter-Domains entscheiden nie |
+| `src/konversation.py` | Stufe 2 Thread (`conversationId`, eine Mail reicht, streut er → Kandidaten), Stufe 3 Absender-Bezug (nur Kandidaten) |
+| `src/profil.py` | Ordnerprofile (Haiku, 2–3 Saetze, woechentlich, `profil_manuell` bleibt), parallel 6 |
+| `src/urteil.py` | Stufe 4: Ordnerbaum + Profile im Systemprompt (cache_control), Kandidaten mit Vorrang, `sicher|unsicher|nirgends`, unbekannter Pfad = unsicher |
+| `src/kaskade.py` | fuehrt 1→4 zusammen, `bewegt()`/`kategorie()`, `protokolliere()` nach `regel_entscheidung` |
+| `src/llm.py` | Haiku (`claude-haiku-4-5`) mit Structured Outputs, Ausfall = None |
+| `src/worker.py` | Schleife: Index + Profil-Auffrischung, Heartbeat, DRY_RUN |
+| `migrations/001_index.sql` | `ordner`, `mail`, Sicht `mail_evidenz` (Gewicht Hand=2/auto=1), `regel_entscheidung`, `worker_heartbeat` |
+| `scripts/` | `index_lauf.py`, `profil_lauf.py`, `trockenlauf.py` (Messung), `test_regel.py` (19 Pruefungen ohne DB) |
+
+Betrieb: `/opt/schoeps-mail` auf dem VPS (Klon von GitHub `HelmutWittek/schoeps-mail`,
+oeffentlich), `.env` dort (chmod 600), DB `schoepsmail` mit Rolle `schoepsmail` in
+`lifeos-postgres`, Compose-Netz `lifeos_default` extern. Skripte:
+`docker compose run --rm -T --no-deps worker python scripts/<x>.py`. Erstlauf des Index:
+20 Minuten fuer 114.352 Mails. **Der ANTHROPIC_API_KEY ist derselbe wie bei LifeOS**
+(aus `/opt/lifeos/.env` uebernommen).
+
+## Phase 1: Befund (2026-09-14)
+
+- Index: **114.352 Mails, 517 Ordner (97 Arbeitsordner), 76.975 Evidenz-Mails,
+  5.523 Absender, 67.813 Konversationen, aelteste Mail 2005.** Groesste Zielordner:
+  `Posteingang/SCHOEPS intern` 7.762, `Posteingang/Redmine, Planio, Slite` 4.075,
+  `…/AI, Automation/Auto emails` 2.798, `❾ List/MicBuilder Yahoo` 2.499.
+- Profile: 420 Zielordner, 391 per Haiku (630k Tokens ein, 58k aus, ~0,90 USD),
+  29 zu klein (< 3 Mails, nur Name). Stichprobe gelesen: treffend und konkret.
+- **Trockenlauf ohne KI, 500 Mails aus 12 Monaten:** Adresse 321 Entscheidungen,
+  **99,4 %** richtig; Domain 5, 100 %; Thread 56, **80,4 %**; 118 unklar. Zusammen
+  wuerden 76 % bewegt, davon 96,6 % richtig.
+- **Befund zum Thread-Fehler:** 10 der 11 Fehlgriffe betreffen `Posteingang/SCHOEPS
+  intern` — die Mail liegt dort, der Thread zeigt in den Themenordner (oder
+  umgekehrt). Helmuts bisherige Ablage legt Kollegen-Antworten in den
+  Sammelordner, sein Wunsch fuer den Automaten ist der Themenordner. Das ist also
+  kein Fehler der Stufe, sondern ein **Konflikt zwischen alter Praxis und neuer
+  Regel**; offen ist, ob `SCHOEPS intern` (und andere Posteingang-Sammelordner) aus
+  der Thread-Evidenz ausgenommen werden soll — Entscheidung Helmut.
+- **Trockenlauf mit KI, 200 Mails — abgebrochen durch leeres Anthropic-Guthaben**
+  (`credit balance is too low`, nach ~50 Mails; derselbe Key wie LifeOS, dessen
+  Extraktor/Spiegel/Urteile/Briefing damit ebenfalls stehen, bis aufgeladen ist).
+  Bis dahin: Adresse 131/131, Thread 14/18, **KI `sicher` 16 Entscheidungen, 7
+  richtig (43,8 %)** — aber 6 der 9 Fehlgriffe sind wieder der SCHOEPS-intern-
+  Konflikt (Urlaubsantrag → `Verwaltung/Personal/AIDA`, FWC26-Shipments →
+  `Leihgaben, Rental/FIFA, UEFA`: thematisch richtig, historisch „falsch").
+  Ohne diesen Konflikt 7 von 10. Zu klein fuer ein Urteil; **Messung mit 200
+  KI-Entscheidungen wiederholen, sobald Guthaben da ist.** Ein echter Fehler
+  dabei: Zendesk-Ticket fiel bis zur KI durch, weil `zendesk.com` als
+  Anbieter-Domain die GANZE Domain-Stufe sperrte → `regel_kandidaten` stoppt den
+  Rollup jetzt nur VOR der Anbieter-Ebene, `schoeps.zendesk.com` darf entscheiden.
+  Einmal `400 Invalid request data` von Anthropic bei einer Mail — Ursache offen
+  (vermutlich Inhalt), bei der Wiederholung beobachten.
+- **Access Policy:** per Graph auch 70 Minuten nach `New-ApplicationAccessPolicy`
+  noch 200 auf das Kollegen-Postfach, obwohl `Test-ApplicationAccessPolicy`
+  „Abgelehnt" sagt. Vor Phase 2 klaeren (`Get-ApplicationAccessPolicy`, ggf.
+  Scope ueber eine E-Mail-aktivierte Sicherheitsgruppe statt Nutzer).
 
 Sprache: Antworten, Kommentare und Docstrings auf Deutsch, knapp. Keine
 Aufwandsschaetzungen in Stunden oder Tagen (Umfang und Risiko nennen, Laufzeit
@@ -151,7 +213,7 @@ Alarm bei Fehlern und 30 Tage vor Secret-Ablauf.
 | Phase | Inhalt | Stand |
 |---|---|---|
 | 0 | Zugang, Move, Kategorien, Slack | erledigt 2026-09-14 (Policy-Gegenprobe offen) |
-| 1 | Index (Ordnerbaum, Metadaten aller Ordner, Delta je Ordner), Konversationen, Ordnerprofile, **Trockenlauf-Messung**: 200 Mails aus Ordnern ziehen, Ordner verstecken, alle vier Stufen raten lassen; Ziel >= ~90 % Treffer bei `sicher` | offen |
+| 1 | Index (Ordnerbaum, Metadaten aller Ordner, Delta je Ordner), Konversationen, Ordnerprofile, **Trockenlauf-Messung**: 200 Mails aus Ordnern ziehen, Ordner verstecken, alle vier Stufen raten lassen; Ziel >= ~90 % Treffer bei `sicher` | gebaut + gelaufen 2026-09-14, siehe Befund |
 | 2 | Stufen 1–3 scharf, Kategorien, Schalter `DRY_RUN` | offen |
 | 3 | Stufe 4 scharf, Protokoll mit Begruendungen | offen |
 | 4 | Vorschlaege A–C, Slack, Bestaetigungsseite, Profile editierbar | offen |

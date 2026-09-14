@@ -78,6 +78,23 @@ def domain_kandidaten(domain: str) -> list[str]:
     return aus
 
 
+def regel_kandidaten(domain: str) -> list[str]:
+    """Domain-Kandidaten fuer die Regel-Stufe: der Rollup stoppt VOR der Anbieter-Ebene.
+
+    Bei Anbieter-Domains ist die Subdomain die Identitaet: `schoeps.zendesk.com`
+    darf entscheiden (alle Tickets liegen im Zendesk-Ordner), `zendesk.com` nicht —
+    dahinter stecken beliebige Firmen. Trockenlauf 2026-09-14: weil die ganze
+    Domain uebersprungen wurde, fiel ein Zendesk-Ticket bis zur KI durch und
+    landete falsch.
+    """
+    aus: list[str] = []
+    for kand in domain_kandidaten(domain):
+        if kand in ANBIETER_DOMAINS:
+            break
+        aus.append(kand)
+    return aus
+
+
 def ist_eigene(domain: str) -> bool:
     return any(k in EIGENE_DOMAINS for k in domain_kandidaten(domain))
 
@@ -139,9 +156,9 @@ async def nach_adresse(s: AsyncSession, adresse: str, ohne_mail_id: str | None =
 async def nach_domain(s: AsyncSession, domain: str, ohne_mail_id: str | None = None
                       ) -> dict[str, Any] | None:
     domain = (domain or "").strip().lower()
-    if not domain or ist_eigene(domain) or ist_anbieter(domain):
+    if not domain or ist_eigene(domain):
         return None
-    for kand in domain_kandidaten(domain):
+    for kand in regel_kandidaten(domain):
         zeilen = await _verteilung(
             s, "(von_domain = :d OR von_domain LIKE :sub)",
             {"d": kand, "sub": "%." + kand, "ohne": ohne_mail_id},

@@ -36,6 +36,12 @@ pruefe(not regel.ist_eigene("schoeps-fan.de"), "aehnlicher Name ist nicht eigene
 pruefe(regel.ist_anbieter("support.zendesk.com") and regel.ist_anbieter("gmail.com"), "Anbieter inkl. Subdomain")
 pruefe(not regel.ist_anbieter("sennheiser.com"), "Hersteller ist kein Anbieter")
 
+pruefe(regel.regel_kandidaten("schoeps.zendesk.com") == ["schoeps.zendesk.com"],
+       "Anbieter: Subdomain darf entscheiden, Rollup stoppt vor zendesk.com")
+pruefe(regel.regel_kandidaten("gmail.com") == [], "Anbieter selbst: keine Kandidaten")
+pruefe(regel.regel_kandidaten("news.sennheiser.com") == ["news.sennheiser.com", "sennheiser.com"],
+       "normale Domain rollt voll")
+
 # Auswertung
 Z = [("o1", "A", 8.0), ("o2", "B", 2.0)]
 pruefe(regel.auswerten(Z)["ziel_pfad"] == "A" and regel.auswerten(Z)["anteil"] == 0.8, "80 % reichen genau")
