@@ -25,6 +25,9 @@ services:
       DRY_RUN: ${DRY_RUN:-1}
       POLL_SECONDS: ${POLL_SECONDS:-120}
       TZ: Europe/Berlin
+      # Skripte laufen als `python scripts/x.py` und importieren `src.` — ohne
+      # PYTHONPATH zeigt sys.path nur auf scripts/.
+      PYTHONPATH: /app
     volumes:
       # Bind-Mounts wie bei LifeOS: ein `restart` reicht fuer Code-Aenderungen,
       # kein Build noetig.
