@@ -13,7 +13,7 @@ import sys
 
 os.environ.setdefault("EIGENE_DOMAINS", "schoeps.de")
 
-from src import absender_pruefung as ap, urteil  # noqa: E402
+from src import absender_pruefung as ap, kaskade, urteil  # noqa: E402
 
 FAELLE = 0
 
@@ -70,5 +70,21 @@ pruefe(urteil.ziel_leer(" NIRGENDS. ") and urteil.ziel_leer("'nirgends'"),
 pruefe(urteil.ziel_leer("-") and urteil.ziel_leer("kein Ordner"), "Strich und 'kein Ordner'")
 pruefe(not urteil.ziel_leer("❼ privat"), "echter Pfad ist nicht leer")
 pruefe(not urteil.ziel_leer("Posteingang/Standby"), "Sammelordner ist ein echter Pfad")
+
+# Wegraeumen nach Move/Unbestimmt (Entscheidung Helmut 2026-09-15)
+pruefe(kaskade.nach_unbestimmt({"stufe": "unklar", "vorfilter": True}),
+       "Vorfilter-Treffer wird weggeraeumt")
+pruefe(kaskade.nach_unbestimmt({"stufe": "ki", "sicherheit": "nirgends"}),
+       "KI-`nirgends` wird weggeraeumt")
+pruefe(not kaskade.nach_unbestimmt({"stufe": "ki", "sicherheit": "unsicher"}),
+       "`unsicher` bleibt in Move, damit Helmut es sieht")
+pruefe(not kaskade.nach_unbestimmt({"stufe": "unklar", "vorfilter": False}),
+       "unklar ohne Vorfilter wartet auf Evidenz und bleibt liegen")
+pruefe(not kaskade.nach_unbestimmt({"stufe": "adresse", "ordner_id": "x"}),
+       "eine Statistik-Entscheidung wird nie weggeraeumt")
+pruefe(kaskade.kategorie({"stufe": "ki", "sicherheit": "nirgends"}) == "auto-unbestimmt",
+       "weggeraeumte Mails bekommen auto-unbestimmt")
+pruefe(kaskade.kategorie({"stufe": "ki", "sicherheit": "sicher"}) == "auto-ki",
+       "ein sicheres KI-Urteil behaelt auto-ki")
 
 print(f"\n{FAELLE} Pruefungen gruen.")

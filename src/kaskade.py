@@ -25,10 +25,15 @@ log = logging.getLogger("schoepsmail.kaskade")
 # Sicherheit, ab der Stufe 4 bewegen darf.
 KI_BEWEGT_AB = "sicher"
 
+# Marke fuer alles, was der Sortierer nach `Move/Unbestimmt` wegraeumt.
+KATEGORIE_UNBESTIMMT = "auto-unbestimmt"
 
-def _unklar(begruendung: str, kandidaten: list[dict[str, Any]]) -> dict[str, Any]:
+
+def _unklar(begruendung: str, kandidaten: list[dict[str, Any]],
+            vorfilter: bool = False) -> dict[str, Any]:
     return {"stufe": "unklar", "ordner_id": None, "ziel_pfad": None, "sicherheit": None,
-            "anteil": None, "begruendung": begruendung, "kandidaten": kandidaten}
+            "anteil": None, "begruendung": begruendung, "kandidaten": kandidaten,
+            "vorfilter": vorfilter}
 
 
 async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None = None,
@@ -60,7 +65,7 @@ async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None 
     verdacht = await absender_pruefung.pruefe(s, mail)
     if verdacht:
         log.info("Vorfilter haelt Mail an: %s", verdacht)
-        return _unklar(f"Absender-Vorfilter: {verdacht}", kandidaten)
+        return _unklar(f"Absender-Vorfilter: {verdacht}", kandidaten, vorfilter=True)
     text_ = ""
     if graph is not None:
         try:
@@ -83,7 +88,32 @@ def bewegt(e: dict[str, Any]) -> bool:
 
 
 def kategorie(e: dict[str, Any]) -> str:
+    if nach_unbestimmt(e):
+        return KATEGORIE_UNBESTIMMT
     return {"adresse": "auto-regel", "domain": "auto-regel", "thread": "auto-thread", "ki": "auto-ki"}[e["stufe"]]
+
+
+def nach_unbestimmt(e: dict[str, Any]) -> bool:
+    """Soll diese Mail nach `Move/Unbestimmt` weggeraeumt werden?
+
+    Entscheidung Helmut 2026-09-15: Post, die in keinen Ordner gehoert, soll
+    nicht im Arbeitsvorrat `Move` liegen bleiben, sondern in den Ordner, den er
+    fuer „kann ich selbst nicht sortieren" angelegt hat. Zwei Faelle:
+
+    - der Absender-Vorfilter hat angehalten (Junk-Historie, getarnter Name),
+    - die KI sagt `nirgends` — kein bestehender Ordner passt.
+
+    NICHT `unsicher`: da passt das Thema, nur der Ordner ist unklar. Solche
+    Mails bleiben in `Move` vor Helmuts Augen. Ebenso wenig `unklar` ohne
+    Vorfilter (keine Historie, KI aus) — die wartet nur auf Evidenz.
+
+    `Move/Unbestimmt` bleibt Arbeitsordner: nie Ziel der KI (steht nicht im
+    Ordnerbaum), nie Evidenz. Sonst lernte die Statistik, Absender dorthin zu
+    sortieren — die Sackgasse, die LifeOS bei `INBOX/Unbekannt` ausgeschlossen hat.
+    """
+    if e.get("vorfilter"):
+        return True
+    return e["stufe"] == "ki" and e.get("sicherheit") == "nirgends"
 
 
 async def protokolliere(s: AsyncSession, mail_id: str, e: dict[str, Any], dry_run: bool,

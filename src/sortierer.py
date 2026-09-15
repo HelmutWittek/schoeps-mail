@@ -4,8 +4,17 @@ Je Mail laeuft die Kaskade (Phase 2: Stufen 1–3, `mit_ki=False`; Phase 3
 schaltet das Urteil zu). Ist das Ergebnis belastbar (`kaskade.bewegt`), bekommt
 die Mail die Kategorie ihrer Stufe und wandert per Graph in den Zielordner; der
 Index wird sofort nachgezogen, nicht erst beim naechsten Delta. Was unklar
-bleibt, bleibt in Move — Entscheidung Helmut, kein Unbekannt-Ordner — und wird
-beim naechsten Zyklus neu bewertet, weil inzwischen Historie entstanden sein kann.
+bleibt, bleibt in Move und wird beim naechsten Zyklus neu bewertet, weil
+inzwischen Historie entstanden sein kann.
+
+Eine Ausnahme davon seit 2026-09-15 (Entscheidung Helmut): Post, die in keinen
+Ordner GEHOERT — der Absender-Vorfilter hat angehalten, oder die KI sagt
+`nirgends` — wandert mit der Marke `auto-unbestimmt` nach `Move/Unbestimmt`,
+den Ordner fuer „kann ich selbst nicht sortieren". Das haelt den Arbeitsvorrat
+`Move` frei von Akquise und Fremdthemen. `unsicher` bleibt ausdruecklich in
+Move: da passt das Thema, nur der Ordner ist unklar, und das soll Helmut sehen.
+Wirksam wird es mit Stufe 4 (`SORTIERER_KI=1`); ohne KI gibt es keine
+`nirgends`-Urteile und der Vorfilter laeuft nicht.
 
 DRY_RUN: dieselbe Entscheidung, nur protokolliert (`regel_entscheidung.dry_run`),
 nichts bewegt. Damit im Trockenlauf nicht alle zwei Minuten dieselbe Zeile
@@ -28,19 +37,27 @@ from src.graph import Graph
 log = logging.getLogger("schoepsmail.sortierer")
 
 MOVE_PFAD = os.getenv("MOVE_PFAD", "Posteingang/Move")
+# Ablage fuer Post, die in keinen Ordner gehoert (Vorfilter-Treffer, KI sagt
+# `nirgends`) — Entscheidung Helmut 2026-09-15. Fehlt der Ordner im Index,
+# bleiben diese Mails einfach in `Move` liegen.
+UNBESTIMMT_PFAD = os.getenv("UNBESTIMMT_PFAD", "Posteingang/Move/Unbestimmt")
 PROTOKOLL_PAUSE_MIN = int(os.getenv("PROTOKOLL_PAUSE_MIN", "360"))
-KATEGORIEN = ["auto-regel", "auto-thread", "auto-ki", "auto-neu"]
+KATEGORIEN = ["auto-regel", "auto-thread", "auto-ki", "auto-neu", kaskade.KATEGORIE_UNBESTIMMT]
 
 FELDER = ("m.id, m.ordner_id, m.conversation_id, m.von_adresse, m.von_name, m.von_domain, "
           "m.an, m.betreff, m.vorschau, m.empfangen_am, m.kategorien")
 
 
-async def move_ordner() -> tuple[str, str] | None:
+async def ordner_nach_pfad(pfad: str) -> tuple[str, str] | None:
     async with get_session() as s:
         r = await s.execute(text("SELECT id, pfad FROM ordner WHERE pfad = :p AND verschwunden_am IS NULL"),
-                            {"p": MOVE_PFAD})
+                            {"p": pfad})
         row = r.fetchone()
     return (row[0], row[1]) if row else None
+
+
+async def move_ordner() -> tuple[str, str] | None:
+    return await ordner_nach_pfad(MOVE_PFAD)
 
 
 async def lade_move_mails(ordner_id: str) -> list[dict[str, Any]]:
@@ -111,6 +128,9 @@ async def sortiere(graph: Graph, dry_run: bool = True, mit_ki: bool = False) -> 
     if not mails:
         return z
     ordnerliste = None
+    unbestimmt = await ordner_nach_pfad(UNBESTIMMT_PFAD)
+    if unbestimmt is None:
+        log.warning("Ordner %r nicht im Index — `nirgends` bleibt in Move liegen", UNBESTIMMT_PFAD)
     if mit_ki:
         async with get_session() as s:
             ordnerliste = await urteil.lade_ordnerliste(s)
@@ -127,6 +147,24 @@ async def sortiere(graph: Graph, dry_run: bool = True, mit_ki: bool = False) -> 
                 log.info("→ %s  [%s]  %r", e["ziel_pfad"], e["stufe"], (m["betreff"] or "")[:60])
             except Exception as exc:  # noqa: BLE001 — eine Mail darf den Durchgang nicht kosten
                 log.error("Move fehlgeschlagen fuer %r: %s", (m["betreff"] or "")[:60], exc)
+                z["move_fehler"] += 1
+            continue
+        # Gehoert in keinen Ordner (Vorfilter oder KI-`nirgends`): nach
+        # `Move/Unbestimmt` wegraeumen, statt den Arbeitsvorrat zu fuellen.
+        if kaskade.nach_unbestimmt(e) and unbestimmt is not None:
+            ziel = {**e, "ordner_id": unbestimmt[0], "ziel_pfad": unbestimmt[1]}
+            if dry_run:
+                if not await _schon_protokolliert(m["id"], ziel):
+                    async with get_session() as s:
+                        await kaskade.protokolliere(s, m["id"], ziel, dry_run=True)
+                    log.info("(dry) ⇢ %s  %r", unbestimmt[1], (m["betreff"] or "")[:60])
+                continue
+            try:
+                await verschiebe(graph, m, ziel)
+                z["unbestimmt"] += 1
+                log.info("⇢ %s  %r", unbestimmt[1], (m["betreff"] or "")[:60])
+            except Exception as exc:  # noqa: BLE001
+                log.error("Wegraeumen fehlgeschlagen fuer %r: %s", (m["betreff"] or "")[:60], exc)
                 z["move_fehler"] += 1
             continue
         if not await _schon_protokolliert(m["id"], e):
