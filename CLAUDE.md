@@ -1,16 +1,17 @@
 # CLAUDE.md — Schoeps-Mail
 
-Mail-Automation fuer das Schoeps-Postfach `wittek@schoeps.de`. Stand 2026-09-15:
-Phase 0 (Zugang) und Phase 1 (Index + Messung) erledigt, **Phase 2 ist scharf: der
-Worker `schoeps-mail-worker` laeuft dauerhaft auf dem VPS und bewegt seit
-2026-09-15 09:59 (`DRY_RUN='0'`) Mails aus `Posteingang/Move`.** Live-Test davor:
-22 Testmails, 11 Entscheidungen (7 Adresse, 4 Domain), von Helmut alle als richtig
-bestaetigt, 11 ohne Historie blieben liegen (Newsletter/Erstkontakte — Phase 3).
-Erster scharfer Zyklus: 11 bewegt, 0 Fehler. Zurueck in den Trockenlauf =
-`DRY_RUN='1'` in `/opt/schoeps-mail/.env` und `docker compose up -d worker` (die
-.env wird nur beim Erzeugen gelesen, `restart` reicht nicht).
-Betrieb: `docker compose logs -f worker`, Heartbeats in `worker_heartbeat`
-(`sortierer` jeder Zyklus, `index` beim Voll-Sync alle 8 Zyklen).
+Mail-Automation fuer das Schoeps-Postfach `wittek@schoeps.de`. **Stand 2026-09-15
+abends: Phase 2 laeuft scharf im Dauerbetrieb.** Der Worker `schoeps-mail-worker`
+auf dem VPS sortiert `Posteingang/Move` mit Stufe 1–3 (seit 09:59, `DRY_RUN='0'`),
+fuehrt das Bewegungslog und zieht Helmuts Handablagen per Nachzieher auf
+`Move`, `Unbestimmt` und `SCHOEPS intern` nach (seit 14:43, `NACHZIEHER_DRY_RUN='0'`).
+Die KI-Stufe ist gebaut und gemessen, aber **nicht scharf** (`SORTIERER_KI=0`, Phase 3).
+Erster Tag: 62 + 11 Mails aus Move bewegt, 2.305 aus `SCHOEPS intern` verteilt,
+0 Fehler. Details: „Was steht", „Entscheidungen", „Phasen", „Offene Punkte".
+
+**Zwei Claude-Sessions arbeiten parallel in diesem Repo** (Mail-Worker und
+Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
+„Parallele Sessions". Vor jeder Aenderung an dieser Datei: `git pull`.
 
 ## Was steht (Code)
 
@@ -147,9 +148,8 @@ Vorlage: Exchange Online braucht OAuth, und n8n kommt hier nicht vor.
 
 **Datenhaltung:** nur Metadaten (Absender, Anzeigename, Betreff, Datum, Ordner,
 Kategorien, conversationId, Graph-ID, `bodyPreview` 255 Zeichen). Volle Texte
-werden fuer die LLM-Entscheidung geholt, nie gespeichert. Freigabe der
-Datenhaltung gegenueber Schoeps ist Helmuts Sache und **stand am 2026-09-14
-noch aus** — Phase 1 liest nur und verschiebt nichts, darf also laufen.
+werden fuer die LLM-Entscheidung geholt, nie gespeichert. **Freigabe der
+Datenhaltung durch Helmut am 2026-09-14** (siehe Entscheidungen).
 
 ## Zugang (Phase 0, erledigt 2026-09-14)
 
@@ -342,14 +342,71 @@ VPS-.env loeschen). Ein versehentlich kopierter User-Token wurde widerrufen.
 Kein Token-Rotation-Opt-in (Token soll dauerhaft gelten). Stufe 2 spaeter:
 Block-Kit-Buttons mit signiertem Endpunkt hinter Caddy.
 
-## Betrieb (geplant)
+## Betrieb (Ist-Stand 2026-09-15)
 
-VPS `root@212.227.161.180` (SSH: `ssh -i "/c/Users/Wittek/.ssh/id_ed25519"`),
-Repo unter `/opt/schoeps-mail`, ein Container, eigene Datenbank `schoepsmail`
-in der vorhandenen Postgres-Instanz des LifeOS-Stacks (`lifeos-postgres`,
-Netz beitreten), Bestaetigungsseite hinter Caddy mit Basic Auth. `.env` mit
-Sonderzeichen in Single-Quotes, nie per `source` laden. Heartbeat + Slack-
-Alarm bei Fehlern und 30 Tage vor Secret-Ablauf.
+- **Wo:** VPS `root@212.227.161.180` (SSH unter Windows: `ssh -i
+  "/c/Users/Wittek/.ssh/id_ed25519" root@…`), Repo `/opt/schoeps-mail` (Klon von
+  GitHub, oeffentlich), Container `schoeps-mail-worker` (`docker compose up -d`),
+  DB `schoepsmail` / Rolle `schoepsmail` in `lifeos-postgres`, Netz
+  `lifeos_default` (extern). Bestaetigungsseite hinter Caddy: noch nicht gebaut (Phase 4).
+- **`.env`** (chmod 600, Werte in Single-Quotes, nie per `source`):
+  `SCHOEPSMAIL_DB_PASSWORD`, `GRAPH_CLIENT_SECRET`, `GRAPH_SECRET_ABLAUF`
+  (`2028-09-14`), `SLACK_BOT_TOKEN`, `ANTHROPIC_API_KEY` (derselbe wie LifeOS),
+  Schalter `DRY_RUN='0'`, `NACHZIEHER_DRY_RUN='0'`, `SORTIERER_KI` (fehlt = 0).
+  **Die .env wird nur beim Erzeugen des Containers gelesen** — nach einer
+  Aenderung `docker compose up -d worker`, ein `restart` reicht nicht.
+- **Deploy von Code:** `cd /opt/schoeps-mail && git pull && docker compose restart
+  worker` — `src/`, `scripts/`, `migrations/` sind Bind-Mounts, kein Build noetig.
+  Build nur bei `requirements.txt`/`Dockerfile`. Migrationen von Hand:
+  `docker exec -i lifeos-postgres psql -U schoepsmail -d schoepsmail <
+  migrations/00N_x.sql` — eingespielt: 001, 002, 003, 004.
+- **Skripte:** `docker compose run --rm -T --no-deps worker python scripts/<x>.py`
+  (`PYTHONPATH=/app` steht in Compose und Dockerfile, `PYTHONUTF8=1` wegen `❶`).
+- **Beobachten:** `docker compose logs -f worker`; `worker_heartbeat` (`sortierer`
+  jeder Zyklus, `index` beim Voll-Sync); `regel_entscheidung` (jede Entscheidung,
+  `ausgefuehrt`/`dry_run`); `mail_bewegung` (hand/worker). Slack-Alarm in
+  `#mail-sortierer` ab 3 Fehlzyklen in Folge und 30 Tage vor Secret-Ablauf,
+  gedrosselt auf einen je Stunde und Schluessel.
+- **Takt:** Move alle 120 s, Voll-Sync + Profile + Nachzieher alle 8 Zyklen (16 min).
+  Handbewegungen werden also mit bis zu 16 min Verzug erkannt.
+
+## Parallele Sessions (seit 2026-09-15)
+
+Helmut faehrt mehrere Claude-Sessions gleichzeitig, auch in diesem Ordner
+(Mail-Worker; Kalender-Sync nach Google in n8n). Beide schreiben in diese Datei
+und committen auf `main`. Deshalb, wie in LifeOS gelernt:
+
+- **Vor dem Bearbeiten von `CLAUDE.md` immer `git pull`**, danach zeitnah
+  committen und pushen — sonst ueberschreibt der naechste Edit fremde Absaetze.
+- **Nur selbst geaenderte Dateien stagen**, Pfade ausschreiben, nie `git add -A`.
+  Kein History-Rewrite, kein `--force`, fremde Commits erklaeren statt umschreiben.
+- Auf dem VPS vor `git pull` pruefen, ob fremde Commits mitkommen; der Worker
+  liest Code per Bind-Mount erst beim `restart`, ein Pull allein aendert nichts.
+- Fremde Fakten in dieser Datei nicht „korrigieren", ohne sie zu pruefen:
+  Beispiel Calendars-Rolle am 2026-09-15 — eine Session sah `Calendars.ReadWrite`,
+  die naechste keine Kalender-Rolle, die dritte `Calendars.Read`; alle drei
+  stimmten zu ihrem Zeitpunkt, Helmut hatte die Berechtigung zwischendurch
+  umgestellt. Massgeblich ist immer das aktuelle Token (`roles` im JWT).
+
+## Offene Punkte
+
+- **Phase 3, KI-Stufe scharf** (`SORTIERER_KI=1`): gebaut, gemessen (Haiku 66 %,
+  Sonnet 76 % auf reinen KI-Faellen). Vorher Profile fuer Konventions-Ordner von
+  Hand schaerfen (`Reisen, Bahn`, `IT`/`Software`/`AI, Automation`), sonst bleibt
+  die Quote dort. Modellwahl offen: Sonnet praeziser, doppelter Preis.
+- **Phase 4:** Ordnervorschlaege A–C, Slack-Push mit Link, Bestaetigungsseite
+  hinter Caddy (Basic Auth), Profile editierbar, Nachzieher-Vorschlaege fuer
+  Geschwister in anderen Themenordnern.
+- **`SCHOEPS intern`:** 5.457 Mails warten auf die KI-Verteilung (Weg 2); der
+  Nachzieher leert den Ordner nebenbei ueber Helmuts Handablagen.
+- **`Move/Unbestimmt`** als KI-Warteschlange nutzen, sobald Phase 3 laeuft.
+- **Lokale Geheimnis-Dateien** `C:\PROJEKTE\graph_secret.txt` und
+  `C:\PROJEKTE\Slack token.txt` liegen noch — beide stehen in der VPS-.env;
+  Loeschen ist Helmuts Entscheidung.
+- Einmal je Lauf `400 Invalid request data` von Anthropic (Ursache offen, jetzt
+  mit Textlaenge/-anfang geloggt); Haiku erfindet gelegentlich Pfade (wird als
+  unsicher verworfen). Test `scripts/test_regel.py` ist der einzige automatische
+  Test; DB-Tests fuer Bewegungslog/Nachzieher fehlen (Live-Test am 15.09. statt).
 
 ## Phasen
 
@@ -357,23 +414,27 @@ Alarm bei Fehlern und 30 Tage vor Secret-Ablauf.
 |---|---|---|
 | 0 | Zugang, Move, Kategorien, Slack | erledigt 2026-09-14 (Policy-Gegenprobe offen) |
 | 1 | Index (Ordnerbaum, Metadaten aller Ordner, Delta je Ordner), Konversationen, Ordnerprofile, **Trockenlauf-Messung**: 200 Mails aus Ordnern ziehen, Ordner verstecken, alle vier Stufen raten lassen; Ziel >= ~90 % Treffer bei `sicher` | gebaut + gelaufen 2026-09-14, siehe Befund |
-| 2 | Stufen 1–3 scharf, Kategorien, Schalter `DRY_RUN` | **scharf seit 2026-09-15 09:59** (`sortierer.py`, `slack.py`, `worker.py`); Live-Test 22 Mails, 11 bewegt, alle richtig |
-| 3 | Stufe 4 scharf, Protokoll mit Begruendungen | offen |
-| 4 | Vorschlaege A–C, Slack, Bestaetigungsseite, Profile editierbar | offen |
-| 5 | Heartbeat, Alarme, Doku | offen |
+| 2 | Stufen 1–3 scharf, Kategorien, Schalter `DRY_RUN`; **dazu Bewegungslog, Juengste-Hand-Regel, Nachzieher** (Helmuts Wunsch vom 15.09.: Handablage soll auch rueckwaerts wirken) | **scharf seit 2026-09-15** (Sortierer 09:59, Nachzieher 14:43); Live-Tests 22 bzw. 6 Mails, alle Entscheidungen von Helmut bestaetigt |
+| 3 | Stufe 4 (KI) scharf, `Unbestimmt` als KI-Warteschlange, Protokoll mit Begruendungen | offen — Profile vorher schaerfen |
+| 4 | Vorschlaege A–C, Slack-Push, Bestaetigungsseite, Profile editierbar, Nachzieher-Vorschlaege fuer andere Themenordner | offen |
+| 5 | Alarme vervollstaendigen, Doku, DB-Tests | teils (Heartbeat + Slack-Alarm laufen) |
 
-Module (geplant): `graph.py` (Auth, Delta, Move, Kategorien), `index.py`,
-`regel.py` (Stufe 1), `konversation.py` (Stufe 2/3), `profil.py`,
-`urteil.py` (Stufe 4), `vorschlag.py`, `web.py`, `worker.py`. Tests ohne
-Graph und ohne LLM fuer Regel, Konversation und Vorschlagslogik; DB-Tests
-begrenzt auf eigene Testdaten, Aufraeumer loeschen nur eigene Spuren.
+Tests: `scripts/test_regel.py` (27 Pruefungen ohne DB) im Container laufen lassen.
+Regel fuer kuenftige DB-Tests: nur eigene Testdaten (`ZZTEST…`), Aufraeumer loeschen
+nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenzt.
 
-## Skripte aus Phase 0 (`scripts/`)
+## Skripte (`scripts/`)
 
-- `graph_app_test.py` — Client-Credentials-Token, Ordnerbaum, Negativtest
-  fremdes Postfach, Kategorien anlegen. Liest das Secret aus
-  `C:\PROJEKTE\graph_secret.txt`.
-- `graph_policy_wait.py` — pollt, bis die Access Policy 403 liefert.
-- `graph_delegiert_test.py` — Device-Code-Flow (Notnagel), `--output` sichert
-  das Refresh-Token in eine Datei.
-- `slack_test.py` — Bot-Token pruefen, Testnachricht in den Kanal.
+- `index_lauf.py [--nur-ordner]` — Ordnerbaum spiegeln, alle Ordner per Delta
+  nachziehen, Kennzahlen. Erstlauf 20 min.
+- `profil_lauf.py [--nur-fehlende]` — Ordnerprofile erzeugen/auffrischen (Haiku).
+- `trockenlauf.py [--n 200] [--ohne-ki] [--nur-ki] [--monate 12]` — Messung gegen
+  die Historie je Stufe; `--nur-ki` misst die KI auf Faellen, die Stufe 1–3 offen
+  lassen; `-e ANTHROPIC_MODELL=claude-sonnet-5` fuer den Modellvergleich.
+- `intern_verteilen.py [--ohne-ki] [--ausfuehren] [--limit] [--monate]` —
+  Sammelordner aufloesen, Trockenlauf als Default.
+- `test_regel.py` — Logik-Tests ohne DB.
+- Phase 0: `graph_app_test.py` (Client-Credentials, Ordnerbaum, Negativtest,
+  Kategorien), `graph_policy_wait.py` (pollt bis 403), `graph_delegiert_test.py`
+  (Device-Code-Notnagel), `slack_test.py` (Bot-Token, Testnachricht). Lesen das
+  Secret aus `C:\PROJEKTE\graph_secret.txt`.
