@@ -183,6 +183,46 @@ def betreff_tag(betreff: str | None) -> str | None:
     return m.group(1).strip().lower() if m else None
 
 
+JUENGSTE_HAND_N = int(os.getenv("REGEL_JUENGSTE_HAND_N", "3"))
+
+
+async def nach_juengster_hand(s: AsyncSession, adresse: str | None, ohne_mail_id: str | None = None
+                              ) -> dict[str, Any] | None:
+    """Juengste-Hand-Regel: die letzten N Handablagen eines Absenders schlagen die Statistik.
+
+    Legt Helmut einen neuen Ordner an und zieht drei Mails von Absender S
+    hinein, hat S vielleicht 40 alte Mails anderswo — die Adress-Statistik
+    wuerde neue Post von S weiter dorthin schicken. Hier zaehlt die Absicht:
+    zeigen die letzten `JUENGSTE_HAND_N` Handbewegungen (Bewegungslog,
+    Migration 003) von Mails dieses Absenders in DENSELBEN Zielordner, gewinnt
+    dieser Ordner. Bewegungen in Arbeitsordner (Move, Sammelordner) zaehlen
+    nicht, die Regel greift also erst, wenn wirklich abgelegt wurde.
+    """
+    adresse = (adresse or "").strip().lower()
+    if not adresse or "@" not in adresse:
+        return None
+    r = await s.execute(text("""
+        SELECT b.nach_ordner_id, o.pfad
+          FROM mail_bewegung b
+          JOIN mail m ON m.id = b.mail_id
+          JOIN ordner o ON o.id = b.nach_ordner_id
+         WHERE b.quelle = 'hand'
+           AND m.von_adresse = :a
+           AND NOT o.ist_arbeitsordner AND o.verschwunden_am IS NULL
+           AND (CAST(:ohne AS text) IS NULL OR b.mail_id <> CAST(:ohne AS text))
+         ORDER BY b.am DESC
+         LIMIT :n
+    """), {"a": adresse, "ohne": ohne_mail_id, "n": JUENGSTE_HAND_N})
+    zeilen = r.fetchall()
+    if len(zeilen) < JUENGSTE_HAND_N or len({z[0] for z in zeilen}) != 1:
+        return None
+    oid, pfad = zeilen[0]
+    return {"ordner_id": oid, "ziel_pfad": pfad, "treffer": float(JUENGSTE_HAND_N),
+            "gesamt": float(JUENGSTE_HAND_N), "anteil": 1.0, "kandidaten": [],
+            "stufe": "adresse", "schluessel": adresse,
+            "begruendung": f"die letzten {JUENGSTE_HAND_N} Handablagen von {adresse} gingen nach {pfad}"}
+
+
 async def nach_betreff_tag(s: AsyncSession, betreff: str | None, ohne_mail_id: str | None = None
                            ) -> dict[str, Any] | None:
     """Stufe 1b: wohin gingen bisher Mails mit derselben Betreff-Marke? Strenge Schwellen."""
@@ -239,6 +279,12 @@ async def entscheide_statistik(s: AsyncSession, von_adresse: str | None, von_dom
     if not von_adresse:
         return None
     eigene = bool(von_domain and ist_eigene(von_domain))
+    # Juengste Hand vor der Statistik — ausser bei Kollegen (eigene Domain):
+    # drei Handablagen eines Kollegen sagen nichts ueber seine naechste Mail.
+    if not eigene:
+        t = await nach_juengster_hand(s, von_adresse, ohne_mail_id)
+        if t:
+            return t
     t = await nach_adresse(s, von_adresse, ohne_mail_id, streng=eigene)
     if t:
         return t

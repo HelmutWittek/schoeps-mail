@@ -21,7 +21,7 @@ import logging
 import os
 from datetime import date
 
-from src import index, llm, profil, slack, sortierer
+from src import index, llm, nachzieher, profil, slack, sortierer
 from src.graph import Graph
 from src.heartbeat import record_failure, record_success
 
@@ -58,6 +58,14 @@ async def voll_sync(graph: Graph) -> int:
             await profil.profil_lauf()
         except Exception:  # noqa: BLE001 — Profile sind Komfort, kein Muss
             log.exception("Profil-Lauf fehlgeschlagen")
+    # Nachzieher: Helmuts Handbewegungen seit dem letzten Lauf auf die Quell-
+    # Ordner anwenden (eigener Schalter NACHZIEHER_DRY_RUN, Default 1).
+    try:
+        z = await nachzieher.lauf(graph)
+        if z.get("handbewegungen"):
+            log.info("Nachzieher: %s", dict(z))
+    except Exception:  # noqa: BLE001 — darf den Sync nicht kosten
+        log.exception("Nachzieher fehlgeschlagen")
     return neu + weg
 
 

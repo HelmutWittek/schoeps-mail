@@ -80,6 +80,12 @@ async def verschiebe(graph: Graph, m: dict[str, Any], e: dict[str, Any]) -> None
         await s.execute(text("""
             UPDATE mail SET ordner_id = :o, kategorien = :k, aktualisiert_am = now() WHERE id = :id
         """), {"o": e["ordner_id"], "k": neue, "id": m["id"]})
+        # Eigene Bewegung ins Log, damit der Index sie spaeter nicht fuer Hand haelt
+        # (er sieht die Mail dann schon im Zielordner, kein Wechsel mehr).
+        await s.execute(text("""
+            INSERT INTO mail_bewegung (mail_id, von_ordner_id, nach_ordner_id, quelle, verarbeitet_am)
+            VALUES (:m, :von, :nach, 'worker', now())
+        """), {"m": m["id"], "von": m.get("ordner_id"), "nach": e["ordner_id"]})
         await kaskade.protokolliere(s, m["id"], e, dry_run=False, ausgefuehrt=True)
 
 

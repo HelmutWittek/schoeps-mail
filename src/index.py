@@ -185,6 +185,17 @@ async def _schreibe_seite(s: AsyncSession, ordner_id: str, eintraege: list[dict[
         z = _mail_zeile(m)
         if not z["ordner_id"]:
             z["ordner_id"] = ordner_id
+        # Bewegungslog (Migration 003): kennt der Index die Mail schon in einem
+        # ANDEREN Ordner, hat sie jemand verschoben. Der Worker traegt seine
+        # eigenen Moves sofort in `mail` ein (sortierer.verschiebe) — was hier
+        # als Wechsel ankommt, ist also Helmuts Hand (oder eine Client-Regel).
+        r = await s.execute(text("SELECT ordner_id FROM mail WHERE id = :id"), {"id": z["id"]})
+        alt = r.scalar()
+        if alt is not None and alt != z["ordner_id"]:
+            await s.execute(text("""
+                INSERT INTO mail_bewegung (mail_id, von_ordner_id, nach_ordner_id, quelle)
+                VALUES (:m, :von, :nach, 'hand')
+            """), {"m": z["id"], "von": alt, "nach": z["ordner_id"]})
         await s.execute(text("""
             INSERT INTO mail (id, ordner_id, conversation_id, internet_message_id,
                               von_adresse, von_name, von_domain, an, betreff, vorschau,
