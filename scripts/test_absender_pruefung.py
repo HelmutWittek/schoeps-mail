@@ -87,4 +87,17 @@ pruefe(kaskade.kategorie({"stufe": "ki", "sicherheit": "nirgends"}) == "auto-unb
 pruefe(kaskade.kategorie({"stufe": "ki", "sicherheit": "sicher"}) == "auto-ki",
        "ein sicheres KI-Urteil behaelt auto-ki")
 
+# Pfad ohne Bereichsmarke (Haiku laesst `❶ ` weg — 5 von 34 Mails am 2026-09-15)
+pruefe(urteil.normpfad("❶ Produkte/Digital/Illusonic") == "produkte/digital/illusonic",
+       "Bereichsmarke faellt weg")
+pruefe(urteil.normpfad("Produkte/Digital/Illusonic") == urteil.normpfad("❶ Produkte/Digital/Illusonic"),
+       "mit und ohne Marke ergeben denselben Kern")
+pruefe(urteil.normpfad("❻ Verwaltung/Hardware,  Software") == "verwaltung/hardware, software",
+       "doppelter Leerraum wird normiert")
+pruefe(urteil.normpfad("Posteingang/Standby") == "posteingang/standby", "Pfad ohne Marke bleibt")
+pruefe(urteil.normpfad("❾ List/") == "list", "leeres Endsegment faellt weg")
+pruefe(urteil.normpfad(None) == "" and urteil.normpfad("") == "", "leer bleibt leer")
+pruefe(urteil.normpfad("❸ Vertrieb") != urteil.normpfad("❸ Vertrieb/Bekannte"),
+       "Eltern- und Unterordner bleiben verschieden")
+
 print(f"\n{FAELLE} Pruefungen gruen.")

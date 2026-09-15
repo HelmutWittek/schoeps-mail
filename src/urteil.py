@@ -15,6 +15,7 @@ Urteil gleich und wird so nur einmal je fuenf Minuten voll bezahlt.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from sqlalchemy import text
@@ -39,6 +40,28 @@ PFAD_KEINER = {"", "-", "nirgends", "none", "null", "kein", "keiner", "keine",
 def ziel_leer(pfad: str | None) -> bool:
     """Nennt die Antwort gar keinen Ordner (leer oder eine Wortform fuer 'keiner')?"""
     return (pfad or "").strip().strip(".'\"").lower() in PFAD_KEINER
+
+
+# Fuehrende Bereichsmarke eines Pfadsegments: `❶ Produkte` -> `Produkte`.
+# Haiku laesst sie regelmaessig weg und nennt `Produkte/Digital/Illusonic`
+# statt `❶ Produkte/Digital/Illusonic`; der Pfad galt dann als unbekannt und
+# die Entscheidung wurde verworfen (5 von 34 Mails im Messlauf 2026-09-15).
+_MARKE = re.compile(r"^[❶❷❸❹❺❻❼❽❾①-⑨0-9]+[.)\-–—\s]*")
+
+
+def normpfad(pfad: str | None) -> str:
+    """Pfad auf seinen Kern: Bereichsmarken weg, Leerraum normiert, klein.
+
+    Nur fuer den Abgleich gedacht, nie zum Speichern — bewegt wird immer der
+    echte Pfad aus dem Index.
+    """
+    teile = []
+    for seg in (pfad or "").split("/"):
+        seg = _MARKE.sub("", seg.strip())
+        seg = re.sub(r"\s+", " ", seg).strip().lower()
+        if seg:
+            teile.append(seg)
+    return "/".join(teile)
 
 # Eigene Konstante, damit ein Messlauf sie abziehen und beide Fassungen an
 # derselben Stichprobe vergleichen kann (siehe CLAUDE.md, A/B am 2026-09-15).
@@ -142,6 +165,9 @@ async def urteile(s: AsyncSession, mail: dict[str, Any], text_: str,
     if ordner is None:
         ordner = await lade_ordnerliste(s)
     nach_pfad = {o["pfad"]: o["id"] for o in ordner}
+    ohne_marke: dict[str, list[str]] = {}
+    for o in ordner:
+        ohne_marke.setdefault(normpfad(o["pfad"]), []).append(o["pfad"])
 
     system = [
         {"type": "text", "text": REGELN},
@@ -169,9 +195,17 @@ async def urteile(s: AsyncSession, mail: dict[str, Any], text_: str,
         return {"stufe": "ki", "ordner_id": None, "ziel_pfad": None, "sicherheit": "nirgends",
                 "begruendung": begr, "tokens": antwort["_tokens"]}
     if pfad not in nach_pfad:
-        # Erfundener oder verschriebener Pfad: zaehlt als unsicher, nie als Ziel.
-        log.warning("Urteil nennt unbekannten Pfad %r", pfad)
-        return {"stufe": "ki", "ordner_id": None, "ziel_pfad": pfad, "sicherheit": "unsicher",
-                "begruendung": f"(unbekannter Pfad) {begr}", "tokens": antwort["_tokens"]}
+        # Fehlt nur die Bereichsmarke (`Produkte/…` statt `❶ Produkte/…`), ist der
+        # Ordner trotzdem eindeutig bestimmt — aber nur, wenn genau EINER passt.
+        treffer = ohne_marke.get(normpfad(pfad), [])
+        if len(treffer) == 1:
+            log.info("Pfad %r ohne Bereichsmarke, erkannt als %r", pfad, treffer[0])
+            pfad = treffer[0]
+        else:
+            # Erfundener oder verschriebener Pfad: zaehlt als unsicher, nie als Ziel.
+            log.warning("Urteil nennt unbekannten Pfad %r%s", pfad,
+                        f" ({len(treffer)} mehrdeutige Treffer)" if treffer else "")
+            return {"stufe": "ki", "ordner_id": None, "ziel_pfad": pfad, "sicherheit": "unsicher",
+                    "begruendung": f"(unbekannter Pfad) {begr}", "tokens": antwort["_tokens"]}
     return {"stufe": "ki", "ordner_id": nach_pfad[pfad], "ziel_pfad": pfad,
             "sicherheit": sicherheit, "begruendung": begr, "tokens": antwort["_tokens"]}
