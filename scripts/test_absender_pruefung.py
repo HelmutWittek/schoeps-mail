@@ -96,6 +96,17 @@ pruefe(urteil.normpfad("❻ Verwaltung/Hardware,  Software") == "verwaltung/hard
        "doppelter Leerraum wird normiert")
 pruefe(urteil.normpfad("Posteingang/Standby") == "posteingang/standby", "Pfad ohne Marke bleibt")
 pruefe(urteil.normpfad("❾ List/") == "list", "leeres Endsegment faellt weg")
+# Jahreszahlen sind Ordnernamen, keine Marken — eine erste Fassung mit `0-9`
+# in der Marke erzeugte 13 Kollisionen im echten Ordnerbaum.
+pruefe(urteil.normpfad("❺ Ausstellung/AES/2006-2024/2006 San Francisco")
+       != urteil.normpfad("❺ Ausstellung/AES/2006-2024/2008 San Francisco"),
+       "zwei AES-Jahrgaenge bleiben unterscheidbar")
+pruefe(urteil.normpfad("❺ Ausstellung/IBC/2026").endswith("/2026"),
+       "reiner Jahresordner behaelt sein Segment")
+pruefe(urteil.normpfad("❺ Ausstellung/AES/2006-2024") == "ausstellung/aes/2006-2024",
+       "Jahresbereich bleibt vollstaendig")
+pruefe(urteil.normpfad("❺ Ausstellung/IBC") != urteil.normpfad("❺ Ausstellung/IBC/2026"),
+       "Ordner und sein Jahres-Unterordner bleiben verschieden")
 pruefe(urteil.normpfad(None) == "" and urteil.normpfad("") == "", "leer bleibt leer")
 pruefe(urteil.normpfad("❸ Vertrieb") != urteil.normpfad("❸ Vertrieb/Bekannte"),
        "Eltern- und Unterordner bleiben verschieden")

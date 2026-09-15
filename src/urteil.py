@@ -46,7 +46,13 @@ def ziel_leer(pfad: str | None) -> bool:
 # Haiku laesst sie regelmaessig weg und nennt `Produkte/Digital/Illusonic`
 # statt `❶ Produkte/Digital/Illusonic`; der Pfad galt dann als unbekannt und
 # die Entscheidung wurde verworfen (5 von 34 Mails im Messlauf 2026-09-15).
-_MARKE = re.compile(r"^[❶❷❸❹❺❻❼❽❾①-⑨0-9]+[.)\-–—\s]*")
+#
+# NUR die Kreisziffern, ausdruecklich KEINE arabischen Ziffern: Jahreszahlen
+# sind hier bedeutungstragende Ordnernamen. Eine erste Fassung mit `0-9`
+# erzeugte 13 Kollisionen — `2006 San Francisco` und `2008 San Francisco`
+# wurden gleich, der Jahresbereich `2006-2024` wurde zu `2024`, und ein reiner
+# Jahresordner (`IBC/2026`) verlor sein letztes Segment ganz.
+_MARKE = re.compile(r"^[❶❷❸❹❺❻❼❽❾①②③④⑤⑥⑦⑧⑨]+[.)\-–—\s]*")
 
 
 def normpfad(pfad: str | None) -> str:
