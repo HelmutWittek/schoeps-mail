@@ -465,6 +465,34 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   `urteil.ziel_leer()` die Wortformen ab (`PFAD_KEINER`). Ebenfalls gesehen:
   ein erfundener Pfad (`❺ Ausstellung/Ravenna, Netzwerk` fuer den
   Lawo-Newsletter) — wird wie gebaut als `unsicher` verworfen.
+- **Prompt-Regel gegen Anbieter-Akquise** (`urteil.REGEL_AKQUISE`, eigene
+  Konstante, damit ein Messlauf sie abziehen kann): unaufgeforderte Angebote von
+  Anbietern sind `nirgends`, auch wenn ein Ordner thematisch passt; ausgenommen
+  Kundenanfragen, Bewerbungen, Presse, Branchen-Einladungen. **A/B an derselben
+  Mailmenge gemessen** (beide Fassungen je Mail, weil Haiku zwischen Laeufen
+  stark streut — der Lawo-Newsletter bekam in drei Calls drei Antworten):
+  - *28 Move-Mails:* 5 Aenderungen, 4 davon gewollt (PCB-Angebot, Fertiger aus
+    China, Gulfood-Messe, Personalvermittler → `nirgends`). `unsicher` fiel von
+    3 auf 0, `sicher` von 3 auf 2. Mit Zusatz wandern 26 der 28 nach
+    `Unbestimmt`. Nebeneffekt: der Lawo-Newsletter kippte von `unsicher` auf
+    `sicher ❸ Vertrieb/Bekannte, Branche`.
+  - *34 abgelegte Mails aus der Historie (Gegentest „schadet der Zusatz echter
+    Post?"):* **`nirgends` blieb bei 1 — keine einzige echte Geschaeftspost
+    wurde als Akquise verworfen.** Das war das Risiko, es ist nicht eingetreten.
+    Trefferquote bei `sicher` nominell 16/28 (57 %) ohne, 14/28 (50 %) mit
+    Zusatz; die Unterschiede liegen aber bei Faellen ohne Akquise-Bezug
+    (`❽ Jobs/Entwicklung…` → `❽ Jobs`, Illusonic-Mails springen zwischen
+    `❶ Produkte/Digital/Illusonic` und `❸ Vertrieb/Bekannte, Branche`) — bei 28
+    Entscheidungen sind 2 Faelle Rauschen, kein Signal.
+- **Beide Fassungen liegen bei 50–57 % und damit weit unter dem 90-%-Ziel**
+  (dokumentiert waren 66 % auf anderer Stichprobe). Phase 3 ist unabhaengig vom
+  Akquise-Zusatz noch nicht scharfschaltbar.
+- **Haiku laesst das Bereichspraefix weg** — `Produkte/Digital/Illusonic` statt
+  `❶ Produkte/…`, `Posteingang/Slite` statt `Posteingang/Redmine, Planio,
+  Slite`. Der Pfad gilt dann als unbekannt und die Entscheidung wird verworfen
+  (5x in einem Lauf ueber 34 Mails). Ein toleranter Abgleich — Praefixziffern
+  und `❶…❾` ignorieren, nur bei genau EINEM Treffer zuordnen — wuerde einen Teil
+  zurueckholen. Noch nicht gebaut, Entscheidung Helmut.
 - **Prompt-Injection:** der Mailtext ging bis dahin unmarkiert in den Urteils-
   Prompt. Jetzt in `<mail>`-Klammern, mit der Regel, dass Anweisungen darin ein
   Merkmal der Mail sind (Grund fuer `unsicher`), kein Auftrag. Der Schaden waere
