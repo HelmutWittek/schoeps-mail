@@ -1,11 +1,14 @@
 # CLAUDE.md — Schoeps-Mail
 
 Mail-Automation fuer das Schoeps-Postfach `wittek@schoeps.de`. Stand 2026-09-15:
-Phase 0 (Zugang) und Phase 1 (Index + Messung) erledigt, **Phase 2 gebaut und der
-Worker laeuft dauerhaft auf dem VPS (`schoeps-mail-worker`, seit 2026-09-15 09:38)
-— noch mit `DRY_RUN=1`**: er protokolliert, was er mit `Posteingang/Move` taete,
-bewegt aber nichts. Scharf schalten = `DRY_RUN='0'` in `/opt/schoeps-mail/.env`
-und `docker compose up -d worker` (die .env wird nur beim Erzeugen gelesen).
+Phase 0 (Zugang) und Phase 1 (Index + Messung) erledigt, **Phase 2 ist scharf: der
+Worker `schoeps-mail-worker` laeuft dauerhaft auf dem VPS und bewegt seit
+2026-09-15 09:59 (`DRY_RUN='0'`) Mails aus `Posteingang/Move`.** Live-Test davor:
+22 Testmails, 11 Entscheidungen (7 Adresse, 4 Domain), von Helmut alle als richtig
+bestaetigt, 11 ohne Historie blieben liegen (Newsletter/Erstkontakte — Phase 3).
+Erster scharfer Zyklus: 11 bewegt, 0 Fehler. Zurueck in den Trockenlauf =
+`DRY_RUN='1'` in `/opt/schoeps-mail/.env` und `docker compose up -d worker` (die
+.env wird nur beim Erzeugen gelesen, `restart` reicht nicht).
 Betrieb: `docker compose logs -f worker`, Heartbeats in `worker_heartbeat`
 (`sortierer` jeder Zyklus, `index` beim Voll-Sync alle 8 Zyklen).
 
@@ -282,7 +285,7 @@ Alarm bei Fehlern und 30 Tage vor Secret-Ablauf.
 |---|---|---|
 | 0 | Zugang, Move, Kategorien, Slack | erledigt 2026-09-14 (Policy-Gegenprobe offen) |
 | 1 | Index (Ordnerbaum, Metadaten aller Ordner, Delta je Ordner), Konversationen, Ordnerprofile, **Trockenlauf-Messung**: 200 Mails aus Ordnern ziehen, Ordner verstecken, alle vier Stufen raten lassen; Ziel >= ~90 % Treffer bei `sicher` | gebaut + gelaufen 2026-09-14, siehe Befund |
-| 2 | Stufen 1–3 scharf, Kategorien, Schalter `DRY_RUN` | gebaut 2026-09-15 (`sortierer.py`, `slack.py`, `worker.py`); Worker laeuft mit DRY_RUN=1, Live-Test mit Helmuts Testmails in Move steht aus, dann DRY_RUN=0 |
+| 2 | Stufen 1–3 scharf, Kategorien, Schalter `DRY_RUN` | **scharf seit 2026-09-15 09:59** (`sortierer.py`, `slack.py`, `worker.py`); Live-Test 22 Mails, 11 bewegt, alle richtig |
 | 3 | Stufe 4 scharf, Protokoll mit Begruendungen | offen |
 | 4 | Vorschlaege A–C, Slack, Bestaetigungsseite, Profile editierbar | offen |
 | 5 | Heartbeat, Alarme, Doku | offen |
