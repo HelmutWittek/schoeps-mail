@@ -216,6 +216,14 @@ noch aus** — Phase 1 liest nur und verschiebt nichts, darf also laufen.
 - **Unklares bleibt in `Posteingang/Move`.** Kein Unbekannt-Ordner. Der
   Worker bewertet liegengebliebene Mails bei jedem Lauf neu; sobald der
   Absender Historie hat (Helmut sortiert von Hand), greift die Regel.
+  **Ergaenzung 2026-09-15:** Helmut hat `Posteingang/Move/Unbestimmt` angelegt
+  fuer Mails, die er selbst nicht sortieren kann. Der Ordner erbt ueber den
+  Pfad die Arbeitsordner-Eigenschaft von `Move` — nie Ziel, nie Evidenz (sonst
+  wuerde der Automat lernen, Absender dorthin zu sortieren: die Sackgasse, die
+  LifeOS bei `INBOX/Unbekannt` ausgeschlossen hat). Der Sortierer bearbeitet nur
+  `Move` selbst, nicht seine Unterordner. Phase 3 kann `Unbestimmt` spaeter als
+  KI-Warteschlange nutzen. Erster Tag scharf: 62 Mails bewegt (38 Adresse,
+  6 Domain, 18 Thread), 0 Fehler, 31 in `Unbestimmt`, 1 in `Move`.
 - **Der Worker legt fehlende Kategorien selbst an.**
 - **Newsletter werden normal einsortiert** (alle Stufen), erzeugen aber nie
   Ordnervorschlaege und zaehlen nicht in die thematische Verdichtung.
