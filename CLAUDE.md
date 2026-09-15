@@ -26,7 +26,7 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 | `src/absender_pruefung.py` | **Vorfilter vor Stufe 4 (seit 2026-09-15):** haelt Mails an, bevor die KI sie liest — (a) Anzeigename nur aus unsichtbaren Zeichen (Cf/Cc/Co/Cs, Braille-Blank U+2800, Hangul-Filler), (b) Punycode-Domain, (c) Absender/Domain mit Junk-Historie, ohne Evidenz und mit Junk-Anteil >= 0.5. Reine Logik + eine DB-Abfrage, `pruefe()` liefert den Grund. Greift NUR bei `mit_ki` — Stufe 1–3 bleiben unberuehrt |
 | `src/kaskade.py` | fuehrt 1→4 zusammen, `bewegt()`/`kategorie()`, `protokolliere()` nach `regel_entscheidung` |
 | `src/llm.py` | Haiku (`claude-haiku-4-5`) mit Structured Outputs, Ausfall = None |
-| `src/sortierer.py` | Phase 2: Kaskade ueber `Posteingang/Move`, Kategorie + Move per Graph, Index sofort nachgezogen, Bewegungslog `'worker'`, Unklares bleibt; DRY_RUN protokolliert dedupliziert |
+| `src/sortierer.py` | Phase 2: Kaskade ueber `Posteingang/Move`, Kategorie + Move per Graph, Index sofort nachgezogen, Bewegungslog `'worker'`, Unklares bleibt; **was in keinen Ordner gehoert (Vorfilter-Treffer, KI-`nirgends`) wandert mit `auto-unbestimmt` nach `Move/Unbestimmt`** (`UNBESTIMMT_PFAD`, `kaskade.nach_unbestimmt`), `unsicher` bleibt in Move; DRY_RUN protokolliert dedupliziert |
 | `src/nachzieher.py` | **Handablage wirkt rueckwaerts (seit 2026-09-15):** je neuer Handbewegung in einen Themenordner die Geschwister (Thread; Absender per Juengste-Hand-Regel) aus den Quell-Ordnern `Move`, `Move/*`, Sammelordnern nachziehen. Andere Themenordner werden nie angefasst (Phase 4: Vorschlag), Posteingang ist keine Quelle. `NACHZIEHER_DRY_RUN=1` (Default) protokolliert nur und laesst die Bewegungen offen; `NACHZIEHER_MAX_JE_LAUF`=150. **Scharf seit 2026-09-15 14:43** (`NACHZIEHER_DRY_RUN='0'` in der VPS-.env): Test mit 6 Handbewegungen (5 aus `Unbestimmt`, 1 aus Posteingang) → 2 Thread-Geschwister aus `SCHOEPS intern` nachgezogen, von Helmut als richtig bestaetigt |
 | `src/slack.py` | `sende`/`alarm` (gedrosselt je Schluessel, 60 min) in `#mail-sortierer` |
 | `src/worker.py` | Schleife: je Zyklus Move-Delta + Sortieren; alle 8 Zyklen Voll-Sync, Profile, Nachzieher; Heartbeats `sortierer`/`index`; Slack-Alarm ab 3 Fehlern; Secret-Ablauf-Warnung |
@@ -255,7 +255,8 @@ Berechtigungen mitbenutzt.
 - Jede Mail traegt eine `conversationId`. 16 Master-Kategorien vorhanden
   (SCHOEPS, Presse, Buchhaltung, to do, wichtig, privat, …), dazu seit
   2026-09-14 **`auto-regel`, `auto-thread`, `auto-ki`, `auto-neu`** (angelegt
-  per Graph, preset2/8/10/11).
+  per Graph, preset2/8/10/11) und seit 2026-09-15 **`auto-unbestimmt`** (vom
+  Worker beim Start angelegt, fuer alles, was nach `Move/Unbestimmt` wandert).
 
 ## Entscheidungen von Helmut
 
@@ -290,9 +291,16 @@ Berechtigungen mitbenutzt.
   Pfad die Arbeitsordner-Eigenschaft von `Move` — nie Ziel, nie Evidenz (sonst
   wuerde der Automat lernen, Absender dorthin zu sortieren: die Sackgasse, die
   LifeOS bei `INBOX/Unbekannt` ausgeschlossen hat). Der Sortierer bearbeitet nur
-  `Move` selbst, nicht seine Unterordner. Phase 3 kann `Unbestimmt` spaeter als
-  KI-Warteschlange nutzen. Erster Tag scharf: 62 Mails bewegt (38 Adresse,
-  6 Domain, 18 Thread), 0 Fehler, 31 in `Unbestimmt`, 1 in `Move`.
+  `Move` selbst, nicht seine Unterordner. Erster Tag scharf: 62 Mails bewegt
+  (38 Adresse, 6 Domain, 18 Thread), 0 Fehler, 31 in `Unbestimmt`, 1 in `Move`.
+- **Post, die in keinen Ordner GEHOERT, raeumt der Sortierer nach
+  `Move/Unbestimmt` weg** (Entscheidung Helmut 2026-09-15, auf die Frage, wohin
+  eingehende Kaltakquise soll). Marke `auto-unbestimmt`. Zwei Faelle:
+  Absender-Vorfilter hat angehalten, oder die KI sagt `nirgends`. **Nicht**
+  `unsicher` — da passt das Thema und nur der Ordner ist unklar, das soll Helmut
+  sehen; und nicht `unklar` ohne Vorfilter, das wartet nur auf Evidenz. Der
+  Ordner bleibt Arbeitsordner: die KI kann ihn nicht waehlen (er steht nicht im
+  Ordnerbaum), und er wird nie Evidenz. Wirksam mit `SORTIERER_KI=1`.
 - **Der Worker legt fehlende Kategorien selbst an.**
 - **Newsletter werden normal einsortiert** (alle Stufen), erzeugen aber nie
   Ordnervorschlaege und zaehlen nicht in die thematische Verdichtung.
@@ -468,9 +476,12 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   Sonnet 76 % auf reinen KI-Faellen). Vorher Profile fuer Konventions-Ordner von
   Hand schaerfen (`Reisen, Bahn`, `IT`/`Software`/`AI, Automation`), sonst bleibt
   die Quote dort. Modellwahl offen: Sonnet praeziser, doppelter Preis. Der
-  Absender-Vorfilter dafuer steht bereits (siehe unten). **Blocker: Helmuts
-  Entscheidung zur Kaltakquise** — die Messung an den 28 Move-Mails zeigt, dass
-  Haiku Erstkontakt-Werbung thematisch einsortiert (`sicher`).
+  Absender-Vorfilter dafuer steht bereits, ebenso das Wegraeumen nach
+  `Move/Unbestimmt` (Entscheidungen, siehe dort). Was beim Scharfschalten zu
+  beobachten ist: Haiku sortiert Erstkontakt-Werbung mit `sicher` in
+  Themenordner (3 der 5 `sicher`-Faelle in der 28er-Messung, z. B. PCB-Akquise →
+  `❷ Einkauf, Fertigung/Lieferanten`). Das Wegraeumen faengt nur die
+  `nirgends`-Faelle — diese hier nicht.
 - **Phase 4:** Ordnervorschlaege A–C, Slack-Push mit Link, Bestaetigungsseite
   hinter Caddy (Basic Auth), Profile editierbar, Nachzieher-Vorschlaege fuer
   Geschwister in anderen Themenordnern.
