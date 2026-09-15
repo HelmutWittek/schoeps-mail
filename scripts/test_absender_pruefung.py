@@ -61,4 +61,14 @@ pruefe(ap.form_verdacht("IONOS", "xn--ionos-x2a.de") is not None, "Punycode schl
 pruefe(ap.form_verdacht("Sennheiser", "sennheiser.com") is None, "unauffaellige Mail passiert")
 pruefe(ap.form_verdacht(None, None) is None, "leere Felder passieren")
 
+# Urteil: "nirgends" im Pfad-Feld statt in `sicherheit` — Haiku haelt das Schema
+# nicht immer ein (4 der 28 Move-Mails am 2026-09-15)
+pruefe(urteil.ziel_leer("nirgends"), "'nirgends' im Pfadfeld zaehlt als kein Ordner")
+pruefe(urteil.ziel_leer("") and urteil.ziel_leer(None), "leerer Pfad zaehlt als kein Ordner")
+pruefe(urteil.ziel_leer(" NIRGENDS. ") and urteil.ziel_leer("'nirgends'"),
+       "Gross/Klein, Punkt und Anfuehrungszeichen stoeren nicht")
+pruefe(urteil.ziel_leer("-") and urteil.ziel_leer("kein Ordner"), "Strich und 'kein Ordner'")
+pruefe(not urteil.ziel_leer("❼ privat"), "echter Pfad ist nicht leer")
+pruefe(not urteil.ziel_leer("Posteingang/Standby"), "Sammelordner ist ein echter Pfad")
+
 print(f"\n{FAELLE} Pruefungen gruen.")
