@@ -24,9 +24,21 @@ Betrieb: `docker compose logs -f worker`, Heartbeats in `worker_heartbeat`
 | `src/urteil.py` | Stufe 4: Ordnerbaum + Profile im Systemprompt (cache_control), Kandidaten mit Vorrang, `sicher|unsicher|nirgends`, unbekannter Pfad = unsicher |
 | `src/kaskade.py` | fuehrt 1→4 zusammen, `bewegt()`/`kategorie()`, `protokolliere()` nach `regel_entscheidung` |
 | `src/llm.py` | Haiku (`claude-haiku-4-5`) mit Structured Outputs, Ausfall = None |
-| `src/worker.py` | Schleife: Index + Profil-Auffrischung, Heartbeat, DRY_RUN |
+| `src/sortierer.py` | Phase 2: Kaskade ueber `Posteingang/Move`, Kategorie + Move per Graph, Index sofort nachgezogen, Bewegungslog `'worker'`, Unklares bleibt; DRY_RUN protokolliert dedupliziert |
+| `src/nachzieher.py` | **Handablage wirkt rueckwaerts (seit 2026-09-15):** je neuer Handbewegung in einen Themenordner die Geschwister (Thread; Absender per Juengste-Hand-Regel) aus den Quell-Ordnern `Move`, `Move/*`, Sammelordnern nachziehen. Andere Themenordner werden nie angefasst (Phase 4: Vorschlag), Posteingang ist keine Quelle. `NACHZIEHER_DRY_RUN=1` (Default) protokolliert nur und laesst die Bewegungen offen; `NACHZIEHER_MAX_JE_LAUF`=150 |
+| `src/slack.py` | `sende`/`alarm` (gedrosselt je Schluessel, 60 min) in `#mail-sortierer` |
+| `src/worker.py` | Schleife: je Zyklus Move-Delta + Sortieren; alle 8 Zyklen Voll-Sync, Profile, Nachzieher; Heartbeats `sortierer`/`index`; Slack-Alarm ab 3 Fehlern; Secret-Ablauf-Warnung |
 | `migrations/001_index.sql` | `ordner`, `mail`, Sicht `mail_evidenz` (Gewicht Hand=2/auto=1), `regel_entscheidung`, `worker_heartbeat` |
-| `scripts/` | `index_lauf.py`, `profil_lauf.py`, `trockenlauf.py` (Messung), `test_regel.py` (19 Pruefungen ohne DB) |
+| `migrations/002_evidenz_betreff.sql` | `betreff` in der Evidenz-Sicht + Ausdrucks-Index fuer die Betreff-Marke |
+| `migrations/003_mail_bewegung.sql` | **Bewegungslog**: jeder Ordnerwechsel, `quelle` `'hand'` (per Delta gesehen) oder `'worker'` (eigener Move, in `sortierer.verschiebe` geschrieben — der Index sieht die Mail danach schon im Ziel und meldet keinen Wechsel). Graph kennt kein „wer"; das Audit-Log von Exchange waere Purview-only mit 24 h Verzug |
+| `migrations/004_betreff_tag_ci.sql` | Marken-Index case-insensitiv (`Re:` neben `RE:`); Ausdruck buchstabengleich zu `regel.nach_betreff_tag` |
+| `scripts/` | `index_lauf.py`, `profil_lauf.py`, `trockenlauf.py` (Messung, `--nur-ki`), `intern_verteilen.py` (Sammelordner aufloesen), `test_regel.py` (27 Pruefungen ohne DB) |
+
+**Juengste-Hand-Regel** (`regel.nach_juengster_hand`, vor der Adress-Statistik, nicht fuer
+eigene Domain): zeigen die letzten `REGEL_JUENGSTE_HAND_N`=3 Handbewegungen von Mails
+eines Absenders in denselben Themenordner, gewinnt dieser — sonst wuerde ein neuer
+Ordner erst greifen, wenn die Mehrheit der alten Historie umgekippt ist. Greift erst,
+seit das Bewegungslog gefuellt wird (ab 2026-09-15 14:21).
 
 Betrieb: `/opt/schoeps-mail` auf dem VPS (Klon von GitHub `HelmutWittek/schoeps-mail`,
 oeffentlich), `.env` dort (chmod 600), DB `schoepsmail` mit Rolle `schoepsmail` in

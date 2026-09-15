@@ -167,7 +167,8 @@ async def nach_adresse(s: AsyncSession, adresse: str, ohne_mail_id: str | None =
                            f"{adresse} liegen in {t['ziel_pfad']}" + (" (Systemadresse)" if streng else "")}
 
 
-_TAG = re.compile(r"^\s*(?:(?:AW|RE|WG|FW|FWD|Antwort|Zugesagt|Abgelehnt|Angenommen)\s*:\s*)*(\[[^\]]{2,60}\])")
+_TAG = re.compile(r"^\s*(?:(?:AW|RE|WG|FW|FWD|Antwort|Zugesagt|Abgelehnt|Angenommen)\s*:\s*)*(\[[^\]]{2,60}\])",
+                  re.IGNORECASE)
 
 
 def betreff_tag(betreff: str | None) -> str | None:
@@ -233,7 +234,7 @@ async def nach_betreff_tag(s: AsyncSession, betreff: str | None, ohne_mail_id: s
     # sonst als Bind-Parameter `:AW` (bekannte Falle, siehe LifeOS-CLAUDE.md).
     # Der Ausdruck muss buchstabengleich mit dem Index aus Migration 002 sein.
     zeilen = await _verteilung(
-        s, "lower(substring(betreff FROM '^\\s*(?\\:(?\\:AW|RE|WG|FW|FWD|Antwort|Zugesagt|Abgelehnt|Angenommen)"
+        s, "lower(substring(betreff FROM '(?i)^\\s*(?\\:(?\\:AW|RE|WG|FW|FWD|Antwort|Zugesagt|Abgelehnt|Angenommen)"
            "\\s*\\:\\s*)*(\\[[^\\]]{2,60}\\])')) = :tag",
         {"tag": tag, "ohne": ohne_mail_id},
     )
