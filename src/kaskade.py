@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src import konversation, llm, regel, urteil
+from src import absender_pruefung, konversation, llm, regel, urteil
 from src.graph import Graph
 
 log = logging.getLogger("schoepsmail.kaskade")
@@ -54,6 +54,13 @@ async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None 
     # Stufe 4
     if not mit_ki or not llm.aktiv():
         return _unklar("keine Historie, LLM-Stufe aus", kandidaten)
+    # Vorfilter: Stufe 1–3 sind gegen Spam dicht, weil sie Historie brauchen —
+    # Stufe 4 entscheidet ohne. Wer hier auffaellt, bleibt liegen statt geraten
+    # zu werden (siehe absender_pruefung).
+    verdacht = await absender_pruefung.pruefe(s, mail)
+    if verdacht:
+        log.info("Vorfilter haelt Mail an: %s", verdacht)
+        return _unklar(f"Absender-Vorfilter: {verdacht}", kandidaten)
     text_ = ""
     if graph is not None:
         try:
