@@ -435,6 +435,28 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   (`kayne@mymyaily.co`, `madison.gardner@institutionalinvestments…`,
   `s_vinther@tgdgtm.com`) geht in Phase 3 an die KI. Dort muessen `nirgends` und
   „nur `sicher` bewegt" sie halten.
+- **Volle Kaskade mit KI gegen die 28 Mails in `Move`/`Unbestimmt` gemessen**
+  (2026-09-15 abends, nichts bewegt): **11 vom Vorfilter angehalten** (alle
+  Akquise/Messe-Werbung, keine Fehlalarme), **6 `nirgends`**, **6 `unsicher`** —
+  22 der 28 bleiben also zu Recht liegen. **5 `sicher`**, und da liegt die
+  eigentliche Schwaeche: neben einer plausiblen Zuordnung (Bewerbung →
+  `❽ Jobs/Buchhaltung`) sortiert Haiku **Kaltakquise thematisch ein**:
+  `kayne@mymyaily.co` (PCB-Angebot) → `❷ Einkauf, Fertigung/Lieferanten`,
+  `s_vinther@tgdgtm.com` (Lead-Gen-Akquise) → `❹ Marketing/Werbung`,
+  Recruiting-Anfrage → `❸ Vertrieb/Vertriebspartner, Händler`; einmal
+  `Posteingang/Standby` fuer einen chinesischen Fertiger. Thematisch nicht
+  absurd, aber es sind Erstkontakte ohne Geschaeftsbeziehung. **Vor Phase 3 von
+  Helmut zu klaeren:** gehoert eingehende Kaltakquise in den Themenordner, oder
+  braucht die Prompt-Regel „Newsletter und Werbung" einen Zusatz fuer
+  unaufgeforderte Erstkontakte? Ohne diese Entscheidung nicht scharfschalten.
+- **Dabei gefunden und behoben:** Haiku schreibt statt `sicherheit: nirgends`
+  gelegentlich das Wort „nirgends" in das PFAD-Feld (4 der 28 Faelle, 14 %).
+  Das landete im Zweig „unbekannter Pfad" und wurde als `unsicher`
+  protokolliert — verschoben wurde nichts, aber `nirgends` ist die Quelle der
+  Ordnervorschlaege (Phase 4), und dort fehlten die Faelle. Jetzt fangt
+  `urteil.ziel_leer()` die Wortformen ab (`PFAD_KEINER`). Ebenfalls gesehen:
+  ein erfundener Pfad (`❺ Ausstellung/Ravenna, Netzwerk` fuer den
+  Lawo-Newsletter) — wird wie gebaut als `unsicher` verworfen.
 - **Prompt-Injection:** der Mailtext ging bis dahin unmarkiert in den Urteils-
   Prompt. Jetzt in `<mail>`-Klammern, mit der Regel, dass Anweisungen darin ein
   Merkmal der Mail sind (Grund fuer `unsicher`), kein Auftrag. Der Schaden waere
@@ -446,7 +468,9 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   Sonnet 76 % auf reinen KI-Faellen). Vorher Profile fuer Konventions-Ordner von
   Hand schaerfen (`Reisen, Bahn`, `IT`/`Software`/`AI, Automation`), sonst bleibt
   die Quote dort. Modellwahl offen: Sonnet praeziser, doppelter Preis. Der
-  Absender-Vorfilter dafuer steht bereits (siehe unten).
+  Absender-Vorfilter dafuer steht bereits (siehe unten). **Blocker: Helmuts
+  Entscheidung zur Kaltakquise** — die Messung an den 28 Move-Mails zeigt, dass
+  Haiku Erstkontakt-Werbung thematisch einsortiert (`sicher`).
 - **Phase 4:** Ordnervorschlaege A–C, Slack-Push mit Link, Bestaetigungsseite
   hinter Caddy (Basic Auth), Profile editierbar, Nachzieher-Vorschlaege fuer
   Geschwister in anderen Themenordnern.
