@@ -157,12 +157,13 @@ noch aus** — Phase 1 liest nur und verschiebt nichts, darf also laufen.
   App-Registration `LifeOS-Exchange-Reader` (Helmuts eigene, multi-tenant),
   Client-ID `1efdf29e-47c3-4f27-b423-50dadb4b48a3`, Tenant
   `a4941ae5-fcbb-4e45-85f2-fcbc3d7d7079`. Rollen im Token: `Mail.ReadWrite`,
-  `MailboxSettings.ReadWrite`. **`Calendars.*` fehlt** — am 2026-09-15 aus dem
-  Token dekodiert: nur die beiden Mail-Rollen. Die frueher hier notierte
-  `Calendars.ReadWrite` war vermutlich delegiert eingetragen und taucht in
-  einem App-only-Token nie auf; `/users/<UPN>/calendarView` antwortet 403
-  `ErrorAccessDenied`. Wer den Kalender braucht, traegt in Entra die
-  ANWENDUNGS-Berechtigung `Calendars.Read` nach und gibt Admin-Consent.
+  `MailboxSettings.ReadWrite`, `Calendars.Read` (seit 2026-09-15). **Die frueher
+  hier notierte `Calendars.ReadWrite` stand nie im Token** — aus dem JWT
+  dekodiert waren es nur die beiden Mail-Rollen, `/users/<UPN>/calendarView`
+  antwortete 403 `ErrorAccessDenied`. Vermutlich war sie damals als DELEGIERTE
+  Berechtigung eingetragen, und die taucht in einem App-only-Token nie auf.
+  Wer eine Rolle vermisst: Token holen, Mittelteil base64-dekodieren, `roles`
+  lesen — das ist die einzige verlaessliche Quelle, die Portal-Ansicht nicht.
   Token: `client_credentials`, Scope `https://graph.microsoft.com/.default`.
   Pfade immer `/users/wittek@schoeps.de/...`, nie `/me` (gibt es ohne User nicht).
 - **Client-Secret** (24 Monate, laeuft ~2028-09 ab) liegt lokal in
@@ -187,6 +188,52 @@ noch aus** — Phase 1 liest nur und verschiebt nichts, darf also laufen.
   `MailboxSettings.ReadWrite` (mit `Mail.ReadWrite` allein: 403), Zuweisen an
   Mails nicht. Ordnernamen enthalten `❶…❾` — Konsole/Logs auf UTF-8
   (`PYTHONUTF8=1`), sonst `UnicodeEncodeError` beim ersten Ordnerbaum.
+
+## Kalender-Sync nach Google (n8n, seit 2026-09-15)
+
+Kein Code in diesem Repo — der Sync lebt vollstaendig in n8n
+(`n8n.hauptmikrofon.de`, Workflow `Exchange → Google Kalender Sync`,
+ID `eZq2tZusJSgqIjCH`, Schedule alle 10 Minuten). Er steht trotzdem hier, weil
+er an derselben App-Registration haengt wie der Mail-Worker und dessen
+Berechtigungen mitbenutzt.
+
+- **Richtung nur Exchange → Google**, nie zurueck. Ziel ist der Google-Kalender
+  „SCHOEPS sync" (`1db00735…de30f094@group.calendar.google.com`) im Konto
+  `hawittek@gmail.com`. Fenster −60/+365 Tage, das sind 178 Termine (2026-09-15).
+- Gelesen wird `/users/wittek@schoeps.de/calendarView` mit **denselben Client
+  Credentials** wie hier (n8n-Credential Typ `oAuth2Api`, Grant
+  `clientCredentials`, Scope `.default`). Der n8n-Outlook-Node kann nur
+  delegiert — daran waere der Sync alle 3–4 Wochen an der MFA-Erzwingung des
+  Tenants gestorben, wie der LifeOS-Kalender-Worker.
+- Uebertragen werden **nur Titel, Start/Ende und Ort**. Keine Beschreibung,
+  keine Teilnehmer, keine Teams-Links. Als `private`/`confidential` markierte
+  Termine werden zu „Belegt" — greift derzeit nie, keiner der 178 ist so
+  markiert. Wer einen Termin verbergen will, muss ihn in Outlook kennzeichnen.
+- **`calendarView` ohne Kalenderangabe liefert nur den Standardkalender.** Das
+  Postfach hat sieben (`Karin Fléing`, `Privat Google`, `Geburtstage`, Asana,
+  openHAB, Feiertage). Helmuts Entscheidung 2026-09-15: **nur der
+  Standardkalender**. `Privat Google` waere ohnehin eine Rueckspiegelung seines
+  Google-Kalenders und wuerde jeden privaten Termin doppeln. Die
+  Urlaubsbalken der Kollegen liegen in keinem der sieben und waeren fuer die
+  App auch nicht lesbar — die Access Policy begrenzt sie auf sein Postfach.
+- **Google drosselt SCHREIBzugriffe je Kalender hart.** Mit dem Batching aus
+  der Vorlage (10 Anfragen/s) kam jeweils die erste durch, der Rest bekam
+  `403 Rate Limit Exceeded`: von 64 Terminen landeten 34 im Kalender — und die
+  Ausfuehrung galt trotzdem als **erfolgreich**, weil die Schreib-Nodes auf
+  `onError: continueRegularOutput` stehen. Jetzt 1 Anfrage / 1,1 s mit 3
+  Wiederholungen à 5 s. **Lehre: bei `continueRegularOutput` sagt der gruene
+  Haken nichts** — die Fehler stehen als `json.error` an den einzelnen Items
+  des Execution-Protokolls, und geprueft wird am Endzustand, nicht am Status.
+- Abgleich ueber `extendedProperties.private.graphKey` (FNV-1a-Hash der
+  Graph-ID, die selbst zu lang fuer das Feld ist) und `sig`
+  (Titel|Start|Ende|Ort|transparency). Angefasst wird nur, was
+  `graphSource=schoeps` traegt — Handgemachtes im Zielkalender bleibt.
+  Alles idempotent: was scheitert, wird im naechsten Zyklus nachgeholt.
+- Abgesagte und von Helmut abgelehnte Termine werden uebersprungen,
+  `showAs: free` wird als `transparency: transparent` uebernommen.
+- Erfolgreiche Ausfuehrungen werden gespeichert (`saveDataSuccessExecution`),
+  damit man Item-Fehler nachlesen kann. Wenn der Sync stabil laeuft, darf das
+  wieder aus.
 
 ## Postfach-Befund (2026-09-14)
 
