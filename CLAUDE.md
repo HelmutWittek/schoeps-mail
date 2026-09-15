@@ -89,7 +89,10 @@ oeffentlich), `.env` dort (chmod 600), DB `schoepsmail` mit Rolle `schoepsmail` 
   Rollup jetzt nur VOR der Anbieter-Ebene, `schoeps.zendesk.com` darf entscheiden.
   Einmal `400 Invalid request data` von Anthropic bei einer Mail — Ursache offen
   (vermutlich Inhalt), bei der Wiederholung beobachten.
-- **Access Policy greift nur halb (Stand 17:20, 95 min nach Anlage):** auf das
+- **Access Policy greift seit 2026-09-15 vollstaendig:** Kollegen-Postfach 403 fuer
+  `/messages`, `/mailFolders` und `/calendarView`, eigenes Postfach 200. Die
+  Mail-Seite brauchte also ueber Nacht (> 95 min, < 16 h), kein RBAC-Umbau noetig.
+- **Access Policy griff am 14.09. nur halb (Stand 17:20, 95 min nach Anlage):** auf das
   Kollegen-Postfach liefert `/calendarView` **403** (Policy wirkt), aber
   `/messages` und `/mailFolders` weiter **200**. `Test-ApplicationAccessPolicy`
   sagt „Abgelehnt". Also kein Konfigurationsfehler am Scope, sondern die

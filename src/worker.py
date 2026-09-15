@@ -1,15 +1,27 @@
-"""Worker-Schleife. Phase 1: nur Index (Ordnerbaum + Delta), nichts wird bewegt.
+"""Worker-Schleife (Phase 2).
 
-Jeder Zyklus quittiert per Heartbeat. DRY_RUN=1 ist Default und bleibt es,
-bis Phase 2 die Kaskade scharf schaltet.
+Jeder Zyklus (POLL_SECONDS, Default 120 s):
+  1. Delta nur fuer `Posteingang/Move` — billig, eine Graph-Seite.
+  2. Sortieren: Kaskade Stufe 1–3 ueber alles in Move, bewegen oder liegen lassen.
+     DRY_RUN=1 (Default) protokolliert nur. KI-Stufe erst ab Phase 3 (`SORTIERER_KI=1`).
+Jeder VOLL_SYNC_ALLE-te Zyklus (Default 8 → alle 16 min) zusaetzlich:
+  3. Ordnerbaum spiegeln + Delta ueber alle Ordner (haelt die Evidenz frisch;
+     Helmuts Handarbeit im Client wird so zur Regel).
+  4. Ordnerprofile auffrischen, wenn faellig.
+
+Heartbeats `sortierer` (jeder Zyklus) und `index` (Voll-Sync). Ab drei
+Fehlern in Folge geht ein Slack-Alarm, gedrosselt auf einen je Stunde. Beim
+Start werden fehlende auto-Kategorien angelegt und der Ablauf des Client-
+Secrets geprueft (`GRAPH_SECRET_ABLAUF`, Warnung ab 30 Tage davor).
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 import os
+from datetime import date
 
-from src import index, llm, profil
+from src import index, llm, profil, slack, sortierer
 from src.graph import Graph
 from src.heartbeat import record_failure, record_success
 
@@ -18,14 +30,29 @@ logging.getLogger("httpx").setLevel(logging.WARNING)  # eine Zeile je Graph-Seit
 log = logging.getLogger("schoepsmail.worker")
 
 POLL_SECONDS = int(os.getenv("POLL_SECONDS", "120"))
+VOLL_SYNC_ALLE = int(os.getenv("VOLL_SYNC_ALLE", "8"))
 DRY_RUN = os.getenv("DRY_RUN", "1") != "0"
+SORTIERER_KI = os.getenv("SORTIERER_KI", "0") == "1"
+ALARM_AB_FEHLERN = 3
+SECRET_WARNUNG_TAGE = 30
 
 
-async def zyklus(graph: Graph) -> int:
+def _secret_pruefen() -> str | None:
+    ablauf = os.getenv("GRAPH_SECRET_ABLAUF", "").strip()
+    if not ablauf:
+        return None
+    try:
+        rest = (date.fromisoformat(ablauf) - date.today()).days
+    except ValueError:
+        return f"GRAPH_SECRET_ABLAUF={ablauf!r} ist kein ISO-Datum"
+    if rest <= SECRET_WARNUNG_TAGE:
+        return f"Graph-Client-Secret laeuft in {rest} Tagen ab ({ablauf}) — im Azure-Portal erneuern"
+    return None
+
+
+async def voll_sync(graph: Graph) -> int:
     ordner = await index.spiegle_ordner(graph)
     neu, weg = await index.sync_mails(graph, ordner)
-    # Profile auffrischen, wenn faellig (profil.py prueft PROFIL_TAGE selbst;
-    # im Normalfall ist hier nichts zu tun und es kostet eine Abfrage).
     if llm.aktiv():
         try:
             await profil.profil_lauf()
@@ -34,18 +61,52 @@ async def zyklus(graph: Graph) -> int:
     return neu + weg
 
 
+async def move_zyklus(graph: Graph) -> dict[str, int]:
+    mo = await sortierer.move_ordner()
+    if mo is None:
+        await index.spiegle_ordner(graph)
+        mo = await sortierer.move_ordner()
+        if mo is None:
+            raise RuntimeError(f"Move-Ordner {sortierer.MOVE_PFAD!r} existiert nicht im Postfach")
+    await index.sync_ordner(graph, mo[0], mo[1])
+    z = await sortierer.sortiere(graph, dry_run=DRY_RUN, mit_ki=SORTIERER_KI)
+    return dict(z)
+
+
 async def main() -> None:
-    log.info("Schoeps-Mail-Worker startet: poll=%ss dry_run=%s", POLL_SECONDS, DRY_RUN)
+    log.info("Schoeps-Mail-Worker startet: poll=%ss voll_sync_alle=%d dry_run=%s ki=%s",
+             POLL_SECONDS, VOLL_SYNC_ALLE, DRY_RUN, SORTIERER_KI)
     graph = Graph()
+    fehler_in_folge = 0
+    zyklus = 0
     try:
+        try:
+            await sortierer.kategorien_sicherstellen(graph)
+        except Exception:  # noqa: BLE001
+            log.exception("Kategorien nicht geprueft")
+        warnung = _secret_pruefen()
+        if warnung:
+            log.warning(warnung)
+            await slack.alarm("secret", warnung)
         while True:
+            zyklus += 1
             try:
-                n = await zyklus(graph)
-                await record_success("index", n)
-                log.info("Zyklus fertig: %d Aenderungen", n)
+                if zyklus % VOLL_SYNC_ALLE == 1:
+                    n = await voll_sync(graph)
+                    await record_success("index", n)
+                    log.info("Voll-Sync: %d Aenderungen", n)
+                z = await move_zyklus(graph)
+                await record_success("sortierer", z.get("bewegt", 0))
+                if z.get("in_move"):
+                    log.info("Move: %s", z)
+                fehler_in_folge = 0
             except Exception as exc:  # noqa: BLE001
-                log.exception("Zyklus fehlgeschlagen")
-                await record_failure("index", exc)
+                fehler_in_folge += 1
+                log.exception("Zyklus fehlgeschlagen (%d in Folge)", fehler_in_folge)
+                await record_failure("sortierer", exc)
+                if fehler_in_folge >= ALARM_AB_FEHLERN:
+                    await slack.alarm("zyklus", f"Mail-Sortierer: {fehler_in_folge} Zyklen in Folge "
+                                                f"fehlgeschlagen — zuletzt: {type(exc).__name__}: {str(exc)[:200]}")
             await asyncio.sleep(POLL_SECONDS)
     finally:
         await graph.aclose()
