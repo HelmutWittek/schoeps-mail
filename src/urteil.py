@@ -26,6 +26,20 @@ log = logging.getLogger("schoepsmail.urteil")
 
 MAX_TEXT = 3000
 
+# Haiku haelt sich nicht immer an das Schema: statt `sicherheit: nirgends` mit
+# leerem Pfad schreibt es das Wort in das PFAD-Feld. Gemessen 2026-09-15 an den
+# 28 Mails in Move: 4 Faelle (14 %). Ohne diese Liste landen sie im Zweig
+# „unbekannter Pfad" und werden als `unsicher` protokolliert — verschoben wird
+# in beiden Faellen nichts, aber `nirgends` ist die Quelle der Ordnervorschlaege
+# (Phase 4), und dort fehlten sie dann.
+PFAD_KEINER = {"", "-", "nirgends", "none", "null", "kein", "keiner", "keine",
+               "kein ordner", "passt nirgends"}
+
+
+def ziel_leer(pfad: str | None) -> bool:
+    """Nennt die Antwort gar keinen Ordner (leer oder eine Wortform fuer 'keiner')?"""
+    return (pfad or "").strip().strip(".'\"").lower() in PFAD_KEINER
+
 REGELN = (
     "Du sortierst eingehende E-Mails eines Mitarbeiters der SCHOEPS Mikrofone GmbH "
     "(Karlsruhe, Hersteller von Studiomikrofonen) in seine bestehenden Ordner. "
@@ -135,7 +149,7 @@ async def urteile(s: AsyncSession, mail: dict[str, Any], text_: str,
     pfad = (antwort.get("pfad") or "").strip()
     sicherheit = antwort.get("sicherheit")
     begr = (antwort.get("begruendung") or "").strip()[:500]
-    if sicherheit == "nirgends" or not pfad:
+    if sicherheit == "nirgends" or ziel_leer(pfad):
         return {"stufe": "ki", "ordner_id": None, "ziel_pfad": None, "sicherheit": "nirgends",
                 "begruendung": begr, "tokens": antwort["_tokens"]}
     if pfad not in nach_pfad:

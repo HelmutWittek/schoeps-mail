@@ -13,7 +13,7 @@ import sys
 
 os.environ.setdefault("EIGENE_DOMAINS", "schoeps.de")
 
-from src import absender_pruefung as ap  # noqa: E402
+from src import absender_pruefung as ap, urteil  # noqa: E402
 
 FAELLE = 0
 
