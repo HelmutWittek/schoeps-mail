@@ -232,9 +232,13 @@ Berechtigungen mitbenutzt.
   Alles idempotent: was scheitert, wird im naechsten Zyklus nachgeholt.
 - Abgesagte und von Helmut abgelehnte Termine werden uebersprungen,
   `showAs: free` wird als `transparency: transparent` uebernommen.
-- Erfolgreiche Ausfuehrungen werden gespeichert (`saveDataSuccessExecution`),
-  damit man Item-Fehler nachlesen kann. Wenn der Sync stabil laeuft, darf das
-  wieder aus.
+- **Abnahme 2026-09-15:** nach der Drosselung 98 Termine in 110 s nachgefuellt,
+  KW39 stimmt 7:7 gegen Exchange, die beiden Folgelaeufe erzeugten **null**
+  Anweisungen (ein einzelner Patch davor war eine echte Aenderung in Exchange,
+  kein Churn). `saveDataSuccessExecution` steht danach wieder auf `none` —
+  eine Ausfuehrung legt die vollen Exchange- und Google-Antworten ab, knapp
+  1 MB, das waeren bei 144 Laeufen/Tag ueber 130 MB taeglich in der
+  n8n-Datenbank. Zum Debuggen voruebergehend auf `all` stellen.
 
 ## Postfach-Befund (2026-09-14)
 
