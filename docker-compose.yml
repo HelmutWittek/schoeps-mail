@@ -21,9 +21,14 @@ services:
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
       SLACK_KANAL: ${SLACK_KANAL:-C0C18020FN3}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      # Phase 1: nur lesen. Erst Phase 2 setzt DRY_RUN=0.
+      # Schalter (alle aus der .env; sie wird nur beim Erzeugen des Containers gelesen):
+      # DRY_RUN=0 seit 2026-09-15 09:59 (Sortierer bewegt), NACHZIEHER_DRY_RUN=0 seit
+      # 2026-09-15 nachmittags, SORTIERER_KI=1 erst in Phase 3.
       DRY_RUN: ${DRY_RUN:-1}
+      NACHZIEHER_DRY_RUN: ${NACHZIEHER_DRY_RUN:-1}
+      SORTIERER_KI: ${SORTIERER_KI:-0}
       POLL_SECONDS: ${POLL_SECONDS:-120}
+      VOLL_SYNC_ALLE: ${VOLL_SYNC_ALLE:-8}
       TZ: Europe/Berlin
       # Skripte laufen als `python scripts/x.py` und importieren `src.` — ohne
       # PYTHONPATH zeigt sys.path nur auf scripts/.
