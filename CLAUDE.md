@@ -428,6 +428,13 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   angehalten (Konferenz-Akquise `cfp@scika.org`, `smart-it.com`, Messe-Newsletter
   `thesaudifoodshow.com`, `shared1.ccsend.com`), 9 durchgelassen — darunter
   `no-reply@news.lawo.com`, `dhd.news@dhd-audio.de` und eine Bewerbung.
+- **`Move` ist kein vorgefilterter Eingang** (Helmut am 2026-09-15): er zieht die
+  Mails selbst hinein, aber „oft einfach bulkmaessig alles". Damit landet auch
+  alles dort, was Exchange durchgelassen hat — der Vorfilter ist also Betrieb,
+  nicht Vorsorge. Die Luecke, die er offen laesst: Kaltakquise OHNE Junk-Historie
+  (`kayne@mymyaily.co`, `madison.gardner@institutionalinvestments…`,
+  `s_vinther@tgdgtm.com`) geht in Phase 3 an die KI. Dort muessen `nirgends` und
+  „nur `sicher` bewegt" sie halten.
 - **Prompt-Injection:** der Mailtext ging bis dahin unmarkiert in den Urteils-
   Prompt. Jetzt in `<mail>`-Klammern, mit der Regel, dass Anweisungen darin ein
   Merkmal der Mail sind (Grund fuer `unsicher`), kein Auftrag. Der Schaden waere
