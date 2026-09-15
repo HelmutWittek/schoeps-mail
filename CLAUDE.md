@@ -22,7 +22,8 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 | `src/regel.py` | Stufe 1: Adresse, Domain-Rollup, `MIN_EVIDENZ`=2, `MIN_ANTEIL`=0.8, eigene und Anbieter-Domains entscheiden nie |
 | `src/konversation.py` | Stufe 2 Thread (`conversationId`, eine Mail reicht, streut er → Kandidaten), Stufe 3 Absender-Bezug (nur Kandidaten) |
 | `src/profil.py` | Ordnerprofile (Haiku, 2–3 Saetze, woechentlich, `profil_manuell` bleibt), parallel 6 |
-| `src/urteil.py` | Stufe 4: Ordnerbaum + Profile im Systemprompt (cache_control), Kandidaten mit Vorrang, `sicher|unsicher|nirgends`, unbekannter Pfad = unsicher |
+| `src/urteil.py` | Stufe 4: Ordnerbaum + Profile im Systemprompt (cache_control), Kandidaten mit Vorrang, `sicher|unsicher|nirgends`, unbekannter Pfad = unsicher; Mailtext steht in `<mail>`-Klammern mit der Regel, dass er beurteilt und nicht befolgt wird (Anweisungen IN der Mail sind ein Grund fuer `unsicher`) |
+| `src/absender_pruefung.py` | **Vorfilter vor Stufe 4 (seit 2026-09-15):** haelt Mails an, bevor die KI sie liest — (a) Anzeigename nur aus unsichtbaren Zeichen (Cf/Cc/Co/Cs, Braille-Blank U+2800, Hangul-Filler), (b) Punycode-Domain, (c) Absender/Domain mit Junk-Historie, ohne Evidenz und mit Junk-Anteil >= 0.5. Reine Logik + eine DB-Abfrage, `pruefe()` liefert den Grund. Greift NUR bei `mit_ki` — Stufe 1–3 bleiben unberuehrt |
 | `src/kaskade.py` | fuehrt 1→4 zusammen, `bewegt()`/`kategorie()`, `protokolliere()` nach `regel_entscheidung` |
 | `src/llm.py` | Haiku (`claude-haiku-4-5`) mit Structured Outputs, Ausfall = None |
 | `src/sortierer.py` | Phase 2: Kaskade ueber `Posteingang/Move`, Kategorie + Move per Graph, Index sofort nachgezogen, Bewegungslog `'worker'`, Unklares bleibt; DRY_RUN protokolliert dedupliziert |
@@ -388,12 +389,53 @@ und committen auf `main`. Deshalb, wie in LifeOS gelernt:
   stimmten zu ihrem Zeitpunkt, Helmut hatte die Berechtigung zwischendurch
   umgestellt. Massgeblich ist immer das aktuelle Token (`roles` im JWT).
 
+## Spam und Stufe 4 (Befund 2026-09-15)
+
+Anlass war die private Email-Automation (`C:\PROJEKTE\Email-Verarbeitung`), wo
+eine Spam-Mail mit dem Anzeigenamen U+2800 (Braille-Blank) und gefaelschter
+Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
+
+- **In Phase 2 nicht.** Stufe 1–3 entscheiden ausschliesslich aus der
+  Ablage-Historie. Ein Spam-Absender hat keine, keinen Thread und keine
+  Betreff-Marke — er faellt durch alle drei und bleibt in `Move` liegen. Helmuts
+  Entscheidung „Unklares bleibt liegen" wirkt hier als Spamfilter. Auch Spoofing
+  der eigenen Domain traegt nicht: `wittek@schoeps.de` liegt mit 10.824
+  gewichteten Mails nur zu 52 % im Top-Ordner und reisst die strenge Schwelle
+  (90 %, `MIN_ANTEIL_STRENG`) nicht.
+- **Ab Phase 3 schon.** Stufe 4 ist die einzige Stufe, die OHNE Historie
+  entscheidet — also genau die, die jede Spam-Mail erreicht. Deshalb der
+  Vorfilter `absender_pruefung.py` davor.
+- **Der Tarnzeichen-Fall selbst kommt hier nicht vor:** 0 Treffer unter 463
+  Absendernamen mit Nicht-ASCII-Zeichen, 0 Punycode-Domains, 0 in den 6.132
+  Mails der letzten 12 Monate. Die Regel ist Vorsorge, keine Reparatur. Die
+  zwei einzigen Namen mit „unsichtbaren" Zeichen sind japanische Absender
+  (`ysonoda@ktmail.tokai-u.jp`, `ken-usami@capcom.com`) mit U+3000 als Trenner —
+  sie haben echten Text daneben und schlagen nicht an. **Falle:** U+3000 und
+  U+00A0 entfernt `str.strip()` bereits, die Fuellzeichenliste braucht sie nicht.
+- **Das wirksame Merkmal ist stattdessen die Junk-Historie.** 840 Mails von 255
+  Absendern lagen je im Junk; nur 27 dieser Absender haben auch Evidenz in einem
+  Zielordner. Gesperrt wird nur, wer alle drei Bedingungen erfuellt: Junk-Historie,
+  KEINE Evidenz, Junk-Anteil >= 0.5. Jede einzelne Bedingung ist noetig:
+  `slite.com` liegt 22x im Junk, hat aber 341 Evidenz-Mails; `no-reply@news.lawo.com`
+  (Branchen-Hersteller) lag 1 von 3 Mails im Junk und kaeme ohne die
+  Anteilsschwelle nie mehr durch. Von 228 sonst betroffenen Absendern liegen 214
+  ausschliesslich im Junk — die Schwelle kostet also fast keine Trennschaerfe.
+- **Gegenprobe an den 14 Mails, die am 15.09. in `Move`/`Unbestimmt` lagen:** 5
+  angehalten (Konferenz-Akquise `cfp@scika.org`, `smart-it.com`, Messe-Newsletter
+  `thesaudifoodshow.com`, `shared1.ccsend.com`), 9 durchgelassen — darunter
+  `no-reply@news.lawo.com`, `dhd.news@dhd-audio.de` und eine Bewerbung.
+- **Prompt-Injection:** der Mailtext ging bis dahin unmarkiert in den Urteils-
+  Prompt. Jetzt in `<mail>`-Klammern, mit der Regel, dass Anweisungen darin ein
+  Merkmal der Mail sind (Grund fuer `unsicher`), kein Auftrag. Der Schaden waere
+  ohnehin begrenzt — das Urteil kann nur Pfade aus der Liste waehlen.
+
 ## Offene Punkte
 
 - **Phase 3, KI-Stufe scharf** (`SORTIERER_KI=1`): gebaut, gemessen (Haiku 66 %,
   Sonnet 76 % auf reinen KI-Faellen). Vorher Profile fuer Konventions-Ordner von
   Hand schaerfen (`Reisen, Bahn`, `IT`/`Software`/`AI, Automation`), sonst bleibt
-  die Quote dort. Modellwahl offen: Sonnet praeziser, doppelter Preis.
+  die Quote dort. Modellwahl offen: Sonnet praeziser, doppelter Preis. Der
+  Absender-Vorfilter dafuer steht bereits (siehe unten).
 - **Phase 4:** Ordnervorschlaege A–C, Slack-Push mit Link, Bestaetigungsseite
   hinter Caddy (Basic Auth), Profile editierbar, Nachzieher-Vorschlaege fuer
   Geschwister in anderen Themenordnern.
@@ -433,7 +475,8 @@ nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenz
   lassen; `-e ANTHROPIC_MODELL=claude-sonnet-5` fuer den Modellvergleich.
 - `intern_verteilen.py [--ohne-ki] [--ausfuehren] [--limit] [--monate]` —
   Sammelordner aufloesen, Trockenlauf als Default.
-- `test_regel.py` — Logik-Tests ohne DB.
+- `test_regel.py` — Logik-Tests ohne DB (27 Pruefungen).
+- `test_absender_pruefung.py` — Vorfilter-Logik ohne DB (23 Pruefungen: Tarnzeichen, echte Namen, Punycode).
 - Phase 0: `graph_app_test.py` (Client-Credentials, Ordnerbaum, Negativtest,
   Kategorien), `graph_policy_wait.py` (pollt bis 403), `graph_delegiert_test.py`
   (Device-Code-Notnagel), `slack_test.py` (Bot-Token, Testnachricht). Lesen das
