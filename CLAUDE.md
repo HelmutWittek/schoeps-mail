@@ -157,7 +157,12 @@ noch aus** — Phase 1 liest nur und verschiebt nichts, darf also laufen.
   App-Registration `LifeOS-Exchange-Reader` (Helmuts eigene, multi-tenant),
   Client-ID `1efdf29e-47c3-4f27-b423-50dadb4b48a3`, Tenant
   `a4941ae5-fcbb-4e45-85f2-fcbc3d7d7079`. Rollen im Token: `Mail.ReadWrite`,
-  `MailboxSettings.ReadWrite`, `Calendars.ReadWrite` (Read wuerde reichen).
+  `MailboxSettings.ReadWrite`. **`Calendars.*` fehlt** — am 2026-09-15 aus dem
+  Token dekodiert: nur die beiden Mail-Rollen. Die frueher hier notierte
+  `Calendars.ReadWrite` war vermutlich delegiert eingetragen und taucht in
+  einem App-only-Token nie auf; `/users/<UPN>/calendarView` antwortet 403
+  `ErrorAccessDenied`. Wer den Kalender braucht, traegt in Entra die
+  ANWENDUNGS-Berechtigung `Calendars.Read` nach und gibt Admin-Consent.
   Token: `client_credentials`, Scope `https://graph.microsoft.com/.default`.
   Pfade immer `/users/wittek@schoeps.de/...`, nie `/me` (gibt es ohne User nicht).
 - **Client-Secret** (24 Monate, laeuft ~2028-09 ab) liegt lokal in
