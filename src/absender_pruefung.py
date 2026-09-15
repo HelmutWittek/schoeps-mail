@@ -24,7 +24,11 @@ Dieses Modul haelt sie davor an. Zwei Merkmale, beide gegen den Bestand
   Diese 27 sind der Grund fuer das UND: Exchange schiebt auch Legitimes ins
   Junk (`slite.com` 22x im Junk, aber 341 Evidenz-Mails; `mail.anthropic.com`
   15 zu 45). Gesperrt wird darum nur, wer im Junk lag UND nie in einem
-  Zielordner — dann ist er ohnehin ein reiner KI-Fall.
+  Zielordner UND dort die Mehrheit seiner Post hat — dann ist er ohnehin ein
+  reiner KI-Fall. Die dritte Bedingung trennt den Exchange-Fehlgriff vom
+  Spammer: 214 der 228 betroffenen Absender liegen ausschliesslich im Junk,
+  waehrend `no-reply@news.lawo.com` (echter Branchen-Hersteller) bei 1 von 3
+  liegt und darum durchkommt.
 
 Punycode (`xn--`) wird mitgeprueft, obwohl der Bestand **0** solche Domains
 hat: der Test kostet einen Vergleich. Eine Homoglyph-Regel wie drueben gibt es
@@ -61,9 +65,17 @@ FUELLZEICHEN = {
     "\u2591", "\u2592",  # Schattenbloecke, in Spam als Fuellung gesehen
 }
 
-# Ab wie vielen Junk-Mails eine ganze Domain gesperrt wird (eine einzelne
-# reicht bei der Adresse, bei der Domain waere das zu grob).
+# Ab wie vielen Junk-Mails eine ganze Domain gesperrt wird (bei der Adresse
+# reicht eine, bei der Domain waere das zu grob).
 JUNK_MIN_DOMAIN = int(os.getenv("JUNK_MIN_DOMAIN", "3"))
+
+# Anteil der Junk-Mails an allen Mails dieses Absenders. Gemessen 2026-09-15:
+# von 228 Absendern mit Junk-Historie und ohne Evidenz liegen 214 AUSSCHLIESSLICH
+# im Junk, 13 zu 50–99 %, genau einer darunter. Die Schwelle kostet also fast
+# nichts und rettet den Fall, der sonst danebengeht: `no-reply@news.lawo.com`
+# (Branchen-Hersteller, Newsletter) lag 1 von 3 Mails im Junk — ein Fehlgriff
+# des Exchange-Filters, der den Absender sonst dauerhaft von Stufe 4 aussperrt.
+JUNK_MIN_ANTEIL = float(os.getenv("JUNK_MIN_ANTEIL", "0.5"))
 
 
 # ---------------------------------------------------------------- reine Logik
@@ -104,30 +116,36 @@ def form_verdacht(von_name: str | None, von_domain: str | None) -> str | None:
 # -------------------------------------------------------------- mit Historie
 async def junk_verdacht(s: AsyncSession, von_adresse: str | None, von_domain: str | None
                         ) -> str | None:
-    """Lag dieser Absender im Junk, ohne je in einem Zielordner zu liegen?
+    """Liegt dieser Absender ueberwiegend im Junk, ohne je in einem Zielordner
+    zu liegen?
 
-    Beide Zaehlungen laufen ueber `mail_evidenz` als Gegenprobe: die Sicht
-    enthaelt nur Zielordner, Arbeitsordner (Junk, Spambericht, Move, Sent)
-    sind darin nicht. Wer dort auftaucht, wurde von Helmut je abgelegt.
+    Drei Bedingungen, alle noetig: Junk-Historie, KEINE Evidenz, und der Junk
+    stellt die Mehrheit seiner Post (`JUNK_MIN_ANTEIL`). Die Evidenz-Gegenprobe
+    laeuft ueber `mail_evidenz` — die Sicht enthaelt nur Zielordner, Arbeits-
+    ordner (Junk, Spambericht, Move, Sent) sind darin nicht. Wer dort auftaucht,
+    wurde von Helmut je abgelegt und ist damit legitimiert.
     """
     adresse = (von_adresse or "").strip().lower()
     if not adresse:
         return None
     r = await s.execute(text("""
-        SELECT (SELECT count(*) FROM mail m JOIN ordner o ON o.id = m.ordner_id
-                 WHERE m.von_adresse = :a AND o.ist_arbeitsordner
-                   AND (o.pfad ILIKE '%Junk%' OR o.pfad ILIKE '%Spam%')),
+        SELECT count(*) FILTER (WHERE m.von_adresse = :a AND o.ist_arbeitsordner
+                                  AND (o.pfad ILIKE '%Junk%' OR o.pfad ILIKE '%Spam%')),
+               count(*) FILTER (WHERE m.von_adresse = :a),
+               count(*) FILTER (WHERE m.von_domain = :d AND o.ist_arbeitsordner
+                                  AND (o.pfad ILIKE '%Junk%' OR o.pfad ILIKE '%Spam%')),
+               count(*) FILTER (WHERE m.von_domain = :d),
                (SELECT count(*) FROM mail_evidenz WHERE von_adresse = :a),
-               (SELECT count(*) FROM mail m JOIN ordner o ON o.id = m.ordner_id
-                 WHERE m.von_domain = :d AND o.ist_arbeitsordner
-                   AND (o.pfad ILIKE '%Junk%' OR o.pfad ILIKE '%Spam%')),
                (SELECT count(*) FROM mail_evidenz WHERE von_domain = :d)
+          FROM mail m JOIN ordner o ON o.id = m.ordner_id
+         WHERE m.von_adresse = :a OR m.von_domain = :d
     """), {"a": adresse, "d": (von_domain or "").strip().lower()})
-    junk_a, ev_a, junk_d, ev_d = r.fetchone()
-    if junk_a and not ev_a:
-        return f"{adresse} lag {junk_a}x im Junk und nie in einem Zielordner"
-    if junk_d >= JUNK_MIN_DOMAIN and not ev_d and not ist_anbieter(von_domain or ""):
-        return f"Domain {von_domain} lag {junk_d}x im Junk und nie in einem Zielordner"
+    junk_a, ges_a, junk_d, ges_d, ev_a, ev_d = r.fetchone()
+    if junk_a and not ev_a and junk_a / max(ges_a, 1) >= JUNK_MIN_ANTEIL:
+        return f"{adresse} lag {junk_a} von {ges_a} Mails im Junk und nie in einem Zielordner"
+    if (junk_d >= JUNK_MIN_DOMAIN and not ev_d and junk_d / max(ges_d, 1) >= JUNK_MIN_ANTEIL
+            and not ist_anbieter(von_domain or "")):
+        return f"Domain {von_domain} lag {junk_d} von {ges_d} Mails im Junk und nie in einem Zielordner"
     return None
 
 
