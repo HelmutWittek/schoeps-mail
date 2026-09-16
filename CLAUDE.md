@@ -560,8 +560,11 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   Loeschen ist Helmuts Entscheidung.
 - Einmal je Lauf `400 Invalid request data` von Anthropic (Ursache offen, jetzt
   mit Textlaenge/-anfang geloggt); Haiku erfindet gelegentlich Pfade (wird als
-  unsicher verworfen). Test `scripts/test_regel.py` ist der einzige automatische
-  Test; DB-Tests fuer Bewegungslog/Nachzieher fehlen (Live-Test am 15.09. statt).
+  unsicher verworfen — oder, wenn nur die Bereichsmarke fehlt, ueber
+  `urteil.normpfad()` doch zugeordnet). Automatische Tests sind
+  `test_regel.py` (40) und `test_absender_pruefung.py` (47), beide ohne DB;
+  **DB-Tests fuer Bewegungslog, Nachzieher und die harte Ablage fehlen**
+  (bisher nur Live-Tests und Messlaeufe gegen den Bestand).
 
 ## Phasen
 
