@@ -34,7 +34,7 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 | `migrations/002_evidenz_betreff.sql` | `betreff` in der Evidenz-Sicht + Ausdrucks-Index fuer die Betreff-Marke |
 | `migrations/003_mail_bewegung.sql` | **Bewegungslog**: jeder Ordnerwechsel, `quelle` `'hand'` (per Delta gesehen) oder `'worker'` (eigener Move, in `sortierer.verschiebe` geschrieben — der Index sieht die Mail danach schon im Ziel und meldet keinen Wechsel). Graph kennt kein „wer"; das Audit-Log von Exchange waere Purview-only mit 24 h Verzug |
 | `migrations/004_betreff_tag_ci.sql` | Marken-Index case-insensitiv (`Re:` neben `RE:`); Ausdruck buchstabengleich zu `regel.nach_betreff_tag` |
-| `scripts/` | `index_lauf.py`, `profil_lauf.py`, `trockenlauf.py` (Messung, `--nur-ki`), `intern_verteilen.py` (Sammelordner aufloesen), `test_regel.py` (27 Pruefungen ohne DB) |
+| `scripts/` | `index_lauf.py`, `profil_lauf.py`, `trockenlauf.py` (Messung, `--nur-ki`), `intern_verteilen.py` (Sammelordner aufloesen), `test_regel.py` + `test_absender_pruefung.py` (40 + 47 Pruefungen ohne DB) |
 
 **Juengste-Hand-Regel** (`regel.nach_juengster_hand`, vor der Adress-Statistik, nicht fuer
 eigene Domain): zeigen die letzten `REGEL_JUENGSTE_HAND_N`=3 Handbewegungen von Mails
