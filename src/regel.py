@@ -184,6 +184,72 @@ def betreff_tag(betreff: str | None) -> str | None:
     return m.group(1).strip().lower() if m else None
 
 
+# ------------------------------------------------------------- harte Ablage
+# Post aus einem Ticket-System gehoert IMMER in dessen Sammelordner, egal
+# worum es im Ticket geht (Entscheidung Helmut 2026-09-16: „Alle Zendesk-
+# Tickets muessen hart in den Zendesk-Ordner").
+#
+# Warum als eigene Stufe VOR der Statistik und nicht ueber die Profile: die
+# Messung am 2026-09-15 zeigte, dass Haiku Tickets thematisch verteilt —
+# 5 der 13 Fehlgriffe waren „statt Posteingang/Zendesk" (nach Kundenanfragen,
+# Leihgaben, Bekannte Branche). Auch Stufe 1 faengt sie nicht zuverlaessig:
+# `sales@schoeps.de` ist eigene Domain und liegt nur zu 70 % im Zendesk-Ordner,
+# reisst die strenge Schwelle also nicht.
+#
+# Abdeckung im Bestand (907 Mails im Ordner): Domain 563, Betreff-Marke 272,
+# ohne beides 72 (Kollegen-Adressen ohne Marke — die bleiben der Statistik
+# ueberlassen). Ausserhalb wuerde die Regel Neuzugaenge erfassen, die frueher
+# von Hand in Themenordner gingen (~24 Mails von zendesk.com, meist
+# Vertrags- und ERP-Post des Anbieters, ~40 mit Marke) — das ist mit „hart"
+# ausdruecklich gewollt. Bereits abgelegte Mails ruehrt niemand an: der
+# Sortierer arbeitet nur auf `Move`.
+HARTE_ABLAGE: list[dict[str, Any]] = [
+    {
+        "name": "zendesk",
+        "pfad": os.getenv("ZENDESK_PFAD", "Posteingang/Zendesk"),
+        # Domain selbst und alle Subdomains (`schoeps.zendesk.com`,
+        # `status.zendesk.com`, …).
+        "domains": ("zendesk.com",),
+        "marken": tuple(
+            t.strip().lower() for t in os.getenv("ZENDESK_MARKEN", "[Schoeps Mikrofone]").split("|")
+            if t.strip()
+        ),
+    },
+]
+
+
+def harte_ablage(von_domain: str | None, betreff: str | None) -> dict[str, Any] | None:
+    """Greift eine harte Ablage-Regel? Reine Logik, liefert die Regel oder None."""
+    kand = domain_kandidaten(von_domain or "")
+    tag = betreff_tag(betreff)
+    for regel in HARTE_ABLAGE:
+        if any(d in kand for d in regel["domains"]):
+            return {**regel, "grund": f"Absender-Domain {von_domain}"}
+        if tag and tag in regel["marken"]:
+            return {**regel, "grund": f"Betreff-Marke {tag}"}
+    return None
+
+
+async def nach_harter_ablage(s: AsyncSession, von_domain: str | None, betreff: str | None
+                             ) -> dict[str, Any] | None:
+    """Stufe 0: Ticket-System erkannt -> fester Zielordner, ohne Statistik.
+
+    Fehlt der Zielordner im Index, greift die Regel nicht und die Kaskade
+    laeuft normal weiter — nie raten, nie einen Ordner erfinden.
+    """
+    treffer = harte_ablage(von_domain, betreff)
+    if not treffer:
+        return None
+    r = await s.execute(text("SELECT id FROM ordner WHERE pfad = :p AND verschwunden_am IS NULL"),
+                        {"p": treffer["pfad"]})
+    row = r.fetchone()
+    if not row:
+        return None
+    return {"ordner_id": row[0], "ziel_pfad": treffer["pfad"], "treffer": 1.0, "gesamt": 1.0,
+            "anteil": 1.0, "kandidaten": [], "stufe": "hart", "schluessel": treffer["name"],
+            "begruendung": f"{treffer['grund']} — feste Ablage {treffer['name']}"}
+
+
 JUENGSTE_HAND_N = int(os.getenv("REGEL_JUENGSTE_HAND_N", "3"))
 
 
@@ -272,11 +338,17 @@ async def nach_domain(s: AsyncSession, domain: str, ohne_mail_id: str | None = N
 async def entscheide_statistik(s: AsyncSession, von_adresse: str | None, von_domain: str | None,
                                ohne_mail_id: str | None = None, betreff: str | None = None
                                ) -> dict[str, Any] | None:
-    """Stufe 1 komplett: Adresse, Betreff-Marke, Domain.
+    """Stufe 0 und 1: harte Ablage, dann Adresse, Betreff-Marke, Domain.
+
+    Die harte Ablage (Ticket-Systeme) laeuft VOR allem anderen und kennt keine
+    Schwellen — sie ist eine Setzung, keine Statistik.
 
     Eigene Domains: nur die strenge Adress-Regel (Systemadressen) und die
     Betreff-Marke — nie die Domain, nie die lockere Adress-Statistik.
     """
+    t = await nach_harter_ablage(s, von_domain, betreff)
+    if t:
+        return t
     if not von_adresse:
         return None
     eigene = bool(von_domain and ist_eigene(von_domain))

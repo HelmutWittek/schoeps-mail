@@ -68,4 +68,23 @@ pruefe(not kaskade.bewegt({"stufe": "unklar", "ordner_id": None}), "unklar beweg
 pruefe(kaskade.kategorie({"stufe": "domain"}) == "auto-regel" and kaskade.kategorie({"stufe": "thread"}) == "auto-thread",
        "Kategorien je Stufe")
 
+# Harte Ablage (Stufe 0) — Entscheidung Helmut 2026-09-16
+pruefe(regel.harte_ablage("schoeps.zendesk.com", None)["name"] == "zendesk",
+       "eigene Zendesk-Instanz trifft hart")
+pruefe(regel.harte_ablage("status.zendesk.com", None) is not None, "Zendesk-Statusmeldungen treffen hart")
+pruefe(regel.harte_ablage("zendesk.com", None) is not None, "Zendesk-Domain selbst trifft hart")
+pruefe(regel.harte_ablage("notzendesk.com", None) is None, "aehnliche Domain trifft NICHT")
+pruefe(regel.harte_ablage("zendesk.com.beispiel.de", None) is None,
+       "Zendesk als Teil einer fremden Domain trifft nicht")
+pruefe(regel.harte_ablage("kunde.de", "[Schoeps Mikrofone] #64814: Frage zum CMC") is not None,
+       "Betreff-Marke trifft hart, egal von wem")
+pruefe(regel.harte_ablage("kunde.de", "AW: [Schoeps Mikrofone] #64814: Frage") is not None,
+       "Antwort-Praefix vor der Marke wird ueberlesen")
+pruefe(regel.harte_ablage("kunde.de", "Frage zum CMC 6") is None, "normale Mail trifft nicht")
+pruefe(regel.harte_ablage("kunde.de", "[Redmine] Ticket 12") is None, "fremde Marke trifft nicht")
+pruefe(regel.harte_ablage(None, None) is None, "leere Felder treffen nicht")
+pruefe(regel.harte_ablage("sennheiser.com", None) is None, "Wettbewerber trifft nicht")
+pruefe(kaskade.bewegt({"stufe": "hart", "ordner_id": "x"}), "harte Ablage bewegt")
+pruefe(kaskade.kategorie({"stufe": "hart"}) == "auto-regel", "harte Ablage bekommt auto-regel")
+
 print(f"\n{FAELLE} Pruefungen gruen.")
