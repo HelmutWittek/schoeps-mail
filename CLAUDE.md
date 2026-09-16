@@ -19,7 +19,7 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 |---|---|
 | `src/graph.py` | Graph-Client: client_credentials, Retry-After, `IdType=ImmutableId` ueberall, Delta je Ordner (seitenweise), Move, Kategorien, Ordner anlegen, Mailtext holen |
 | `src/index.py` | Ordnerbaum spiegeln (Pfade, Arbeitsordner ueber Well-Known-Namen, Vererbung ausser `inbox`), Delta-Sync mit Commit je Seite; ein Ordnerfehler laesst die anderen durch, Zyklus gilt als gescheitert |
-| `src/regel.py` | Stufe 1: Adresse, Domain-Rollup, `MIN_EVIDENZ`=2, `MIN_ANTEIL`=0.8, eigene und Anbieter-Domains entscheiden nie |
+| `src/regel.py` | **Stufe 0 harte Ablage** (`HARTE_ABLAGE`, `harte_ablage()`): Ticket-Systeme gehen ohne Schwelle in ihren Ordner, vor aller Statistik; dann Stufe 1: Adresse, Domain-Rollup, `MIN_EVIDENZ`=2, `MIN_ANTEIL`=0.8, eigene und Anbieter-Domains entscheiden nie |
 | `src/konversation.py` | Stufe 2 Thread (`conversationId`, eine Mail reicht, streut er → Kandidaten), Stufe 3 Absender-Bezug (nur Kandidaten) |
 | `src/profil.py` | Ordnerprofile (Haiku, 2–3 Saetze, woechentlich, `profil_manuell` bleibt), parallel 6 |
 | `src/urteil.py` | Stufe 4: Ordnerbaum + Profile im Systemprompt (cache_control), Kandidaten mit Vorrang, `sicher|unsicher|nirgends`, unbekannter Pfad = unsicher; Mailtext steht in `<mail>`-Klammern mit der Regel, dass er beurteilt und nicht befolgt wird (Anweisungen IN der Mail sind ein Grund fuer `unsicher`) |
@@ -301,6 +301,23 @@ Berechtigungen mitbenutzt.
   sehen; und nicht `unklar` ohne Vorfilter, das wartet nur auf Evidenz. Der
   Ordner bleibt Arbeitsordner: die KI kann ihn nicht waehlen (er steht nicht im
   Ordnerbaum), und er wird nie Evidenz. Wirksam mit `SORTIERER_KI=1`.
+- **Alle Zendesk-Tickets gehen hart in `Posteingang/Zendesk`** (2026-09-16).
+  Umgesetzt als Stufe 0 (`regel.HARTE_ABLAGE` → `nach_harter_ablage`), vor der
+  gesamten Statistik und ohne Schwellen. Merkmale: Absender-Domain
+  `zendesk.com` samt Subdomains ODER fuehrende Betreff-Marke
+  `[Schoeps Mikrofone]` (`ZENDESK_PFAD`/`ZENDESK_MARKEN` in der Umgebung
+  aenderbar). **Gemessen am Bestand:** 835 der 907 Mails im Ordner werden
+  erkannt (92 %); die restlichen 72 kommen von Kollegen-Adressen ohne Marke und
+  bleiben der Statistik ueberlassen. **71 Mails liegen heute in anderen
+  Zielordnern und traegen die Merkmale** — gleichartige Neuzugaenge gehen
+  kuenftig nach Zendesk; das ist mit „hart" gewollt. Bereits Abgelegtes ruehrt
+  niemand an, der Sortierer arbeitet nur auf `Move`. **Wirkt sofort, nicht erst
+  mit Phase 3**, weil Stufe 0 Teil von Stufe 1 ist.
+  *Beobachtung zum Nachschaerfen:* darunter sind 9 Mails der Firma Zendesk
+  selbst (Vertrag, Rechnung, ERP-Auswahl) in `❻ Verwaltung/…/Software` und
+  `…/ERP`. Wer die ausnehmen will, laesst nur `schoeps.zendesk.com` und die
+  Betreff-Marke hart entscheiden; `status.zendesk.com` faende seinen Ordner
+  dann ueber die Adress-Statistik (341 Mails, praktisch alle in Zendesk).
 - **Der Worker legt fehlende Kategorien selbst an.**
 - **Newsletter werden normal einsortiert** (alle Stufen), erzeugen aber nie
   Ordnervorschlaege und zaehlen nicht in die thematische Verdichtung.
@@ -313,6 +330,11 @@ Berechtigungen mitbenutzt.
 
 ## Entscheidungskaskade (erste belastbare Stufe gewinnt)
 
+0. **Harte Ablage** (seit 2026-09-16): Post aus einem Ticket-System geht
+   IMMER in dessen Ordner, egal worum es geht — keine Schwelle, keine
+   Statistik. Erkannt an der Absender-Domain oder der Betreff-Marke
+   (`regel.HARTE_ABLAGE`). Derzeit nur Zendesk; die Liste ist so gebaut, dass
+   `Redmine, Planio, Slite` ohne Umbau dazukommen kann.
 1. **Adresse**, dann **Domain mit Subdomain-Rollup**: Mindestevidenz 2,
    Konzentration >= 0.8, Gewicht Hand=2 / auto=1 (erkennbar an der
    `auto-*`-Kategorie — eine weggeschobene auto-Mail ist eine Korrektur).
@@ -549,8 +571,8 @@ nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenz
   lassen; `-e ANTHROPIC_MODELL=claude-sonnet-5` fuer den Modellvergleich.
 - `intern_verteilen.py [--ohne-ki] [--ausfuehren] [--limit] [--monate]` —
   Sammelordner aufloesen, Trockenlauf als Default.
-- `test_regel.py` — Logik-Tests ohne DB (27 Pruefungen).
-- `test_absender_pruefung.py` — Vorfilter-Logik ohne DB (23 Pruefungen: Tarnzeichen, echte Namen, Punycode).
+- `test_regel.py` — Logik-Tests ohne DB (40 Pruefungen, inkl. harte Ablage).
+- `test_absender_pruefung.py` — Vorfilter, `ziel_leer`, `nach_unbestimmt`, `normpfad` (47 Pruefungen ohne DB).
 - Phase 0: `graph_app_test.py` (Client-Credentials, Ordnerbaum, Negativtest,
   Kategorien), `graph_policy_wait.py` (pollt bis 403), `graph_delegiert_test.py`
   (Device-Code-Notnagel), `slack_test.py` (Bot-Token, Testnachricht). Lesen das
