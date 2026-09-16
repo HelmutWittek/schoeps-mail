@@ -1,11 +1,14 @@
 # CLAUDE.md — Schoeps-Mail
 
-Mail-Automation fuer das Schoeps-Postfach `wittek@schoeps.de`. **Stand 2026-09-15
-abends: Phase 2 laeuft scharf im Dauerbetrieb.** Der Worker `schoeps-mail-worker`
-auf dem VPS sortiert `Posteingang/Move` mit Stufe 1–3 (seit 09:59, `DRY_RUN='0'`),
-fuehrt das Bewegungslog und zieht Helmuts Handablagen per Nachzieher auf
-`Move`, `Unbestimmt` und `SCHOEPS intern` nach (seit 14:43, `NACHZIEHER_DRY_RUN='0'`).
-Die KI-Stufe ist gebaut und gemessen, aber **nicht scharf** (`SORTIERER_KI=0`, Phase 3).
+Mail-Automation fuer das Schoeps-Postfach `wittek@schoeps.de`. **Stand 2026-09-16:
+Phase 2 laeuft scharf im Dauerbetrieb.** Der Worker `schoeps-mail-worker` auf dem
+VPS sortiert `Posteingang/Move` mit Stufe 0–3 (seit 2026-09-15 09:59,
+`DRY_RUN='0'`), fuehrt das Bewegungslog und zieht Helmuts Handablagen per
+Nachzieher auf `Move`, `Unbestimmt` und `SCHOEPS intern` nach (seit 14:43,
+`NACHZIEHER_DRY_RUN='0'`). Seit 2026-09-16 gehen Zendesk-Tickets ueber die harte
+Stufe 0 in ihren Ordner. Die KI-Stufe ist gebaut und gemessen, aber **nicht
+scharf** (`SORTIERER_KI=0`, Phase 3) — der Vorfilter davor und das Wegraeumen
+nach `Move/Unbestimmt` stehen bereits.
 Erster Tag: 62 + 11 Mails aus Move bewegt, 2.305 aus `SCHOEPS intern` verteilt,
 0 Fehler. Details: „Was steht", „Entscheidungen", „Phasen", „Offene Punkte".
 
@@ -22,7 +25,7 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 | `src/regel.py` | **Stufe 0 harte Ablage** (`HARTE_ABLAGE`, `harte_ablage()`): Ticket-Systeme gehen ohne Schwelle in ihren Ordner, vor aller Statistik; dann Stufe 1: Adresse, Domain-Rollup, `MIN_EVIDENZ`=2, `MIN_ANTEIL`=0.8, eigene und Anbieter-Domains entscheiden nie |
 | `src/konversation.py` | Stufe 2 Thread (`conversationId`, eine Mail reicht, streut er → Kandidaten), Stufe 3 Absender-Bezug (nur Kandidaten) |
 | `src/profil.py` | Ordnerprofile (Haiku, 2–3 Saetze, woechentlich, `profil_manuell` bleibt), parallel 6 |
-| `src/urteil.py` | Stufe 4: Ordnerbaum + Profile im Systemprompt (cache_control), Kandidaten mit Vorrang, `sicher|unsicher|nirgends`, unbekannter Pfad = unsicher; Mailtext steht in `<mail>`-Klammern mit der Regel, dass er beurteilt und nicht befolgt wird (Anweisungen IN der Mail sind ein Grund fuer `unsicher`) |
+| `src/urteil.py` | Stufe 4: Ordnerbaum + Profile im Systemprompt (cache_control), Kandidaten mit Vorrang, `sicher|unsicher|nirgends`; Mailtext in `<mail>`-Klammern mit der Regel, dass er beurteilt und nicht befolgt wird (Anweisungen IN der Mail sind ein Grund fuer `unsicher`). `REGEL_AKQUISE`: unaufgeforderte Anbieter-Akquise ist `nirgends` (eigene Konstante, damit ein Messlauf sie abziehen kann). `ziel_leer()` fangt „nirgends" im Pfad-Feld ab, `normpfad()` ordnet einen Pfad ohne Bereichsmarke zu, wenn genau einer passt; sonst unbekannter Pfad = unsicher |
 | `src/absender_pruefung.py` | **Vorfilter vor Stufe 4 (seit 2026-09-15):** haelt Mails an, bevor die KI sie liest — (a) Anzeigename nur aus unsichtbaren Zeichen (Cf/Cc/Co/Cs, Braille-Blank U+2800, Hangul-Filler), (b) Punycode-Domain, (c) Absender/Domain mit Junk-Historie, ohne Evidenz und mit Junk-Anteil >= 0.5. Reine Logik + eine DB-Abfrage, `pruefe()` liefert den Grund. Greift NUR bei `mit_ki` — Stufe 1–3 bleiben unberuehrt |
 | `src/kaskade.py` | fuehrt 1→4 zusammen, `bewegt()`/`kategorie()`, `protokolliere()` nach `regel_entscheidung` |
 | `src/llm.py` | Haiku (`claude-haiku-4-5`) mit Structured Outputs, Ausfall = None |
@@ -475,10 +478,10 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   `s_vinther@tgdgtm.com` (Lead-Gen-Akquise) → `❹ Marketing/Werbung`,
   Recruiting-Anfrage → `❸ Vertrieb/Vertriebspartner, Händler`; einmal
   `Posteingang/Standby` fuer einen chinesischen Fertiger. Thematisch nicht
-  absurd, aber es sind Erstkontakte ohne Geschaeftsbeziehung. **Vor Phase 3 von
-  Helmut zu klaeren:** gehoert eingehende Kaltakquise in den Themenordner, oder
-  braucht die Prompt-Regel „Newsletter und Werbung" einen Zusatz fuer
-  unaufgeforderte Erstkontakte? Ohne diese Entscheidung nicht scharfschalten.
+  absurd, aber es sind Erstkontakte ohne Geschaeftsbeziehung. **Entschieden am
+  2026-09-15:** solche Post gehoert nach `Move/Unbestimmt` — umgesetzt ueber
+  `REGEL_AKQUISE` (die KI sagt `nirgends`) und `kaskade.nach_unbestimmt` (der
+  Sortierer raeumt weg).
 - **Dabei gefunden und behoben:** Haiku schreibt statt `sicherheit: nirgends`
   gelegentlich das Wort „nirgends" in das PFAD-Feld (4 der 28 Faelle, 14 %).
   Das landete im Zweig „unbekannter Pfad" und wurde als `unsicher`
@@ -512,9 +515,19 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
 - **Haiku laesst das Bereichspraefix weg** — `Produkte/Digital/Illusonic` statt
   `❶ Produkte/…`, `Posteingang/Slite` statt `Posteingang/Redmine, Planio,
   Slite`. Der Pfad gilt dann als unbekannt und die Entscheidung wird verworfen
-  (5x in einem Lauf ueber 34 Mails). Ein toleranter Abgleich — Praefixziffern
-  und `❶…❾` ignorieren, nur bei genau EINEM Treffer zuordnen — wuerde einen Teil
-  zurueckholen. Noch nicht gebaut, Entscheidung Helmut.
+  (5x in einem Lauf ueber 34 Mails). **Gebaut am 2026-09-16** als
+  `urteil.normpfad()`: Bereichsmarke weg, Leerraum normiert, Zuordnung nur bei
+  genau EINEM Treffer, bewegt wird immer der echte Pfad. **Falle dabei, von der
+  Kollisionspruefung gegen alle 422 Zielordner gefunden:** eine erste Fassung
+  strich fuehrende ARABISCHE Ziffern in jedem Segment und erzeugte 13
+  Kollisionen — `2006 San Francisco` und `2008 San Francisco` wurden gleich, der
+  Jahresbereich `2006-2024` wurde zu `2024`, `IBC/2026` verlor sein letztes
+  Segment. Jahreszahlen sind hier Ordnernamen; die Marke sind NUR die
+  Kreisziffern. Danach 0 Kollisionen. **Nutzen bisher nicht belegt:** im
+  Messlauf nach dem Einbau griff die Zuordnung 0x (Haiku liess diesmal kein
+  Praefix weg) — die Mechanik fangt den Fall, wenn er auftritt, taugt aber nicht
+  als Quotenhebel. `Posteingang/Slite` bleibt verworfen: falscher Name, kein
+  fehlendes Praefix.
 - **Prompt-Injection:** der Mailtext ging bis dahin unmarkiert in den Urteils-
   Prompt. Jetzt in `<mail>`-Klammern, mit der Regel, dass Anweisungen darin ein
   Merkmal der Mail sind (Grund fuer `unsicher`), kein Auftrag. Der Schaden waere
@@ -522,16 +535,20 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
 
 ## Offene Punkte
 
-- **Phase 3, KI-Stufe scharf** (`SORTIERER_KI=1`): gebaut, gemessen (Haiku 66 %,
-  Sonnet 76 % auf reinen KI-Faellen). Vorher Profile fuer Konventions-Ordner von
-  Hand schaerfen (`Reisen, Bahn`, `IT`/`Software`/`AI, Automation`), sonst bleibt
-  die Quote dort. Modellwahl offen: Sonnet praeziser, doppelter Preis. Der
-  Absender-Vorfilter dafuer steht bereits, ebenso das Wegraeumen nach
-  `Move/Unbestimmt` (Entscheidungen, siehe dort). Was beim Scharfschalten zu
-  beobachten ist: Haiku sortiert Erstkontakt-Werbung mit `sicher` in
-  Themenordner (3 der 5 `sicher`-Faelle in der 28er-Messung, z. B. PCB-Akquise →
-  `❷ Einkauf, Fertigung/Lieferanten`). Das Wegraeumen faengt nur die
-  `nirgends`-Faelle — diese hier nicht.
+- **Phase 3, KI-Stufe scharf** (`SORTIERER_KI=1`): gebaut und mehrfach gemessen,
+  **nie ueber dem 90-%-Ziel** — 66 % (84 Mails, 14.09.), 57 % und 50 % (34 Mails
+  A/B, 15.09.), 57 % (36 Mails, 16.09.). Sonnet lag einmal bei 76 %; Modellwahl
+  offen, doppelter Preis. Vorher Profile fuer Konventions-Ordner von Hand
+  schaerfen (`Reisen, Bahn`, `IT`/`Software`/`AI, Automation`, dazu Illusonic
+  Partner-vs-Produkt), sonst bleibt die Quote dort. Vorfilter, Akquise-Regel und
+  das Wegraeumen nach `Move/Unbestimmt` stehen bereits.
+- **Die KI-Quote ist nach unten verzerrt und sollte neu gemessen werden.** Im
+  Lauf vom 16.09. waren 5 der 13 Fehlgriffe „statt `Posteingang/Zendesk`" und
+  einer „statt `Posteingang/Redmine, Planio, Slite`" — also Sammelordner-
+  Konflikte, keine Themenfehler. Die Zendesk-Faelle erreichen die KI seit der
+  harten Stufe 0 nicht mehr; ohne sie waeren es 17 von 25 (68 %). Ein neuer
+  `--nur-ki`-Lauf misst jetzt sauberer. **Offen bleibt derselbe Konflikt fuer
+  `Redmine, Planio, Slite`** — dort ist nichts entschieden.
 - **Phase 4:** Ordnervorschlaege A–C, Slack-Push mit Link, Bestaetigungsseite
   hinter Caddy (Basic Auth), Profile editierbar, Nachzieher-Vorschlaege fuer
   Geschwister in anderen Themenordnern.
@@ -557,7 +574,8 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
 | 4 | Vorschlaege A–C, Slack-Push, Bestaetigungsseite, Profile editierbar, Nachzieher-Vorschlaege fuer andere Themenordner | offen |
 | 5 | Alarme vervollstaendigen, Doku, DB-Tests | teils (Heartbeat + Slack-Alarm laufen) |
 
-Tests: `scripts/test_regel.py` (27 Pruefungen ohne DB) im Container laufen lassen.
+Tests: `scripts/test_regel.py` (40) und `scripts/test_absender_pruefung.py` (47),
+beide ohne DB, im Container laufen lassen.
 Regel fuer kuenftige DB-Tests: nur eigene Testdaten (`ZZTEST…`), Aufraeumer loeschen
 nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenzt.
 
