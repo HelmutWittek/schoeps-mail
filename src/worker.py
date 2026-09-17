@@ -33,6 +33,9 @@ POLL_SECONDS = int(os.getenv("POLL_SECONDS", "120"))
 VOLL_SYNC_ALLE = int(os.getenv("VOLL_SYNC_ALLE", "8"))
 DRY_RUN = os.getenv("DRY_RUN", "1") != "0"
 SORTIERER_KI = os.getenv("SORTIERER_KI", "0") == "1"
+# Grobe Vorstufe im Posteingang (uninteressant.py): laeuft wie der Nachzieher
+# immer mit und protokolliert, bewegt aber erst mit POSTEINGANG_DRY_RUN='0'.
+POSTEINGANG_DRY_RUN = os.getenv("POSTEINGANG_DRY_RUN", "1") != "0"
 ALARM_AB_FEHLERN = 3
 SECRET_WARNUNG_TAGE = 30
 
@@ -66,6 +69,15 @@ async def voll_sync(graph: Graph) -> int:
             log.info("Nachzieher: %s", dict(z))
     except Exception:  # noqa: BLE001 — darf den Sync nicht kosten
         log.exception("Nachzieher fehlgeschlagen")
+    # Grobe Vorstufe: bekannt uninteressante Post aus dem Posteingang wegraeumen.
+    # Erst hier, nicht im 2-Minuten-Zyklus — der Posteingang ist gerade frisch
+    # synchronisiert, und der Eingriff in Helmuts Arbeitsplatz soll selten sein.
+    try:
+        z = await sortierer.raeume_posteingang(graph, dry_run=POSTEINGANG_DRY_RUN)
+        if z.get("geraeumt") or z.get("wuerde_raeumen") or z.get("move_fehler"):
+            log.info("Posteingang-Vorstufe: %s", dict(z))
+    except Exception:  # noqa: BLE001 — darf den Sync nicht kosten
+        log.exception("Posteingang-Vorstufe fehlgeschlagen")
     return neu + weg
 
 

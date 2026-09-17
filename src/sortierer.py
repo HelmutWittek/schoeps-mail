@@ -30,7 +30,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from src import kaskade, urteil
+from src import kaskade, uninteressant, urteil
 from src.db import get_session
 from src.graph import Graph
 
@@ -42,7 +42,10 @@ MOVE_PFAD = os.getenv("MOVE_PFAD", "Posteingang/Move")
 # bleiben diese Mails einfach in `Move` liegen.
 UNBESTIMMT_PFAD = os.getenv("UNBESTIMMT_PFAD", "Posteingang/Move/Unbestimmt")
 PROTOKOLL_PAUSE_MIN = int(os.getenv("PROTOKOLL_PAUSE_MIN", "360"))
-KATEGORIEN = ["auto-regel", "auto-thread", "auto-ki", "auto-neu", kaskade.KATEGORIE_UNBESTIMMT]
+KATEGORIEN = ["auto-regel", "auto-thread", "auto-ki", "auto-neu",
+              kaskade.KATEGORIE_UNBESTIMMT, kaskade.KATEGORIE_UNINTERESSANT]
+# Quelle der groben Vorstufe: der Posteingang selbst, ohne Unterordner.
+POSTEINGANG_PFAD = os.getenv("POSTEINGANG_PFAD", "Posteingang")
 
 FELDER = ("m.id, m.ordner_id, m.conversation_id, m.von_adresse, m.von_name, m.von_domain, "
           "m.an, m.betreff, m.vorschau, m.empfangen_am, m.kategorien")
@@ -114,6 +117,48 @@ async def _schon_protokolliert(mail_id: str, e: dict[str, Any]) -> bool:
         """), {"m": mail_id, "pause": PROTOKOLL_PAUSE_MIN})
         row = r.fetchone()
     return bool(row and row[0] == e["stufe"] and row[1] == e.get("ordner_id") and row[2])
+
+
+async def raeume_posteingang(graph: Graph, dry_run: bool = True) -> Counter:
+    """Grobe Vorstufe: bekannt uninteressante Post aus dem Posteingang wegraeumen.
+
+    Bewusst NICHT die Kaskade — im Posteingang laeuft nur die eine Regel aus
+    `uninteressant.pruefe` (Absender, den Helmut selbst schon als uninteressant
+    abgelegt hat, mit vier Sicherheitsnetzen). Alles andere bleibt liegen, damit
+    Helmut es sieht und selbst nach `Move` zieht. Nur Mails direkt im
+    Posteingang, keine Unterordner.
+    """
+    z: Counter = Counter()
+    po = await ordner_nach_pfad(POSTEINGANG_PFAD)
+    ziel = await ordner_nach_pfad(uninteressant.SPAM_PFAD)
+    if not po or not ziel:
+        log.warning("Posteingang (%r) oder %r nicht im Index — Vorstufe uebersprungen",
+                    POSTEINGANG_PFAD, uninteressant.SPAM_PFAD)
+        return z
+    mails = await lade_move_mails(po[0])
+    z["im_posteingang"] = len(mails)
+    for m in mails:
+        async with get_session() as s:
+            grund = await uninteressant.pruefe(s, m)
+        if not grund:
+            continue
+        e = {"stufe": "uninteressant", "ordner_id": ziel[0], "ziel_pfad": ziel[1],
+             "sicherheit": "sicher", "anteil": None, "begruendung": grund, "kandidaten": []}
+        if dry_run:
+            if not await _schon_protokolliert(m["id"], e):
+                async with get_session() as s:
+                    await kaskade.protokolliere(s, m["id"], e, dry_run=True)
+                log.info("(dry) ⇢ %s  %r  [%s]", ziel[1], (m["betreff"] or "")[:50], grund)
+            z["wuerde_raeumen"] += 1
+            continue
+        try:
+            await verschiebe(graph, m, e)
+            z["geraeumt"] += 1
+            log.info("⇢ %s  %r  [%s]", ziel[1], (m["betreff"] or "")[:50], grund)
+        except Exception as exc:  # noqa: BLE001 — eine Mail darf den Lauf nicht kosten
+            log.error("Wegraeumen fehlgeschlagen fuer %r: %s", (m["betreff"] or "")[:50], exc)
+            z["move_fehler"] += 1
+    return z
 
 
 async def sortiere(graph: Graph, dry_run: bool = True, mit_ki: bool = False) -> Counter:

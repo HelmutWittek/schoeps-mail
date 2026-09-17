@@ -13,7 +13,7 @@ import sys
 
 os.environ.setdefault("EIGENE_DOMAINS", "schoeps.de")
 
-from src import absender_pruefung as ap, kaskade, urteil  # noqa: E402
+from src import absender_pruefung as ap, kaskade, uninteressant, urteil  # noqa: E402
 
 FAELLE = 0
 
@@ -86,6 +86,16 @@ pruefe(kaskade.kategorie({"stufe": "ki", "sicherheit": "nirgends"}) == "auto-unb
        "weggeraeumte Mails bekommen auto-unbestimmt")
 pruefe(kaskade.kategorie({"stufe": "ki", "sicherheit": "sicher"}) == "auto-ki",
        "ein sicheres KI-Urteil behaelt auto-ki")
+
+# Grobe Vorstufe im Posteingang (uninteressant.py, 2026-09-17)
+pruefe(kaskade.bewegt({"stufe": "uninteressant", "ordner_id": "x"}),
+       "die Uninteressant-Stufe bewegt")
+pruefe(kaskade.kategorie({"stufe": "uninteressant"}) == "auto-uninteressant",
+       "Uninteressant bekommt die eigene Marke")
+pruefe(not kaskade.nach_unbestimmt({"stufe": "uninteressant"}),
+       "Uninteressant ist kein Unbestimmt-Fall (sonst falsche Marke)")
+pruefe(uninteressant.SPAM_PFAD.startswith("Posteingang/Move/"),
+       "der Spam-Ordner liegt unter Move und ist damit Arbeitsordner")
 
 # Pfad ohne Bereichsmarke (Haiku laesst `❶ ` weg — 5 von 34 Mails am 2026-09-15)
 pruefe(urteil.normpfad("❶ Produkte/Digital/Illusonic") == "produkte/digital/illusonic",

@@ -27,6 +27,8 @@ KI_BEWEGT_AB = "sicher"
 
 # Marke fuer alles, was der Sortierer nach `Move/Unbestimmt` wegraeumt.
 KATEGORIE_UNBESTIMMT = "auto-unbestimmt"
+# Marke fuer bekannt uninteressante Post aus dem Posteingang (siehe uninteressant.py).
+KATEGORIE_UNINTERESSANT = "auto-uninteressant"
 
 
 def _unklar(begruendung: str, kandidaten: list[dict[str, Any]],
@@ -82,7 +84,7 @@ def bewegt(e: dict[str, Any]) -> bool:
     """Darf dieses Ergebnis eine Mail verschieben?"""
     if not e.get("ordner_id"):
         return False
-    if e["stufe"] in ("hart", "adresse", "domain", "thread"):
+    if e["stufe"] in ("hart", "uninteressant", "adresse", "domain", "thread"):
         return True
     return e["stufe"] == "ki" and e.get("sicherheit") == KI_BEWEGT_AB
 
@@ -91,7 +93,8 @@ def kategorie(e: dict[str, Any]) -> str:
     if nach_unbestimmt(e):
         return KATEGORIE_UNBESTIMMT
     return {"hart": "auto-regel", "adresse": "auto-regel", "domain": "auto-regel",
-            "thread": "auto-thread", "ki": "auto-ki"}[e["stufe"]]
+            "thread": "auto-thread", "ki": "auto-ki",
+            "uninteressant": KATEGORIE_UNINTERESSANT}[e["stufe"]]
 
 
 def nach_unbestimmt(e: dict[str, Any]) -> bool:
