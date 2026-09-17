@@ -27,6 +27,7 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 | `src/profil.py` | Ordnerprofile (Haiku, 2–3 Saetze, woechentlich, `profil_manuell` bleibt), parallel 6 |
 | `src/urteil.py` | Stufe 4: Ordnerbaum + Profile im Systemprompt (cache_control), Kandidaten mit Vorrang, `sicher|unsicher|nirgends`; Mailtext in `<mail>`-Klammern mit der Regel, dass er beurteilt und nicht befolgt wird (Anweisungen IN der Mail sind ein Grund fuer `unsicher`). `REGEL_AKQUISE`: unaufgeforderte Anbieter-Akquise ist `nirgends` (eigene Konstante, damit ein Messlauf sie abziehen kann). `ziel_leer()` fangt „nirgends" im Pfad-Feld ab, `normpfad()` ordnet einen Pfad ohne Bereichsmarke zu, wenn genau einer passt; sonst unbekannter Pfad = unsicher |
 | `src/absender_pruefung.py` | **Vorfilter vor Stufe 4 (seit 2026-09-15):** haelt Mails an, bevor die KI sie liest — (a) Anzeigename nur aus unsichtbaren Zeichen (Cf/Cc/Co/Cs, Braille-Blank U+2800, Hangul-Filler), (b) Punycode-Domain, (c) Absender/Domain mit Junk-Historie, ohne Evidenz und mit Junk-Anteil >= 0.5. Reine Logik + eine DB-Abfrage, `pruefe()` liefert den Grund. Greift NUR bei `mit_ki` — Stufe 1–3 bleiben unberuehrt |
+| `src/uninteressant.py` | **Grobe Vorstufe im Posteingang (seit 2026-09-17):** raeumt Post weg, die Helmut selbst schon als uninteressant abgelegt hat — Adresse ab 1 Handbewegung nach `Move/Spam, uninteressant`, Domain ab `SPAM_MIN_DOMAIN`=2. Keine Heuristik auf Betreff/Inhalt, der Erstkontakt bleibt immer liegen. Vier Netze: eigene Domain nie, Evidenz auf der entscheidenden Ebene sperrt, „je hingeschrieben" sperrt, Antwort im Thread sperrt |
 | `src/kaskade.py` | fuehrt 1→4 zusammen, `bewegt()`/`kategorie()`, `protokolliere()` nach `regel_entscheidung` |
 | `src/llm.py` | Haiku (`claude-haiku-4-5`) mit Structured Outputs, Ausfall = None |
 | `src/sortierer.py` | Phase 2: Kaskade ueber `Posteingang/Move`, Kategorie + Move per Graph, Index sofort nachgezogen, Bewegungslog `'worker'`, Unklares bleibt; **was in keinen Ordner gehoert (Vorfilter-Treffer, KI-`nirgends`) wandert mit `auto-unbestimmt` nach `Move/Unbestimmt`** (`UNBESTIMMT_PFAD`, `kaskade.nach_unbestimmt`), `unsicher` bleibt in Move; DRY_RUN protokolliert dedupliziert |
@@ -258,8 +259,10 @@ Berechtigungen mitbenutzt.
 - Jede Mail traegt eine `conversationId`. 16 Master-Kategorien vorhanden
   (SCHOEPS, Presse, Buchhaltung, to do, wichtig, privat, …), dazu seit
   2026-09-14 **`auto-regel`, `auto-thread`, `auto-ki`, `auto-neu`** (angelegt
-  per Graph, preset2/8/10/11) und seit 2026-09-15 **`auto-unbestimmt`** (vom
-  Worker beim Start angelegt, fuer alles, was nach `Move/Unbestimmt` wandert).
+  per Graph, preset2/8/10/11), seit 2026-09-15 **`auto-unbestimmt`** (fuer alles,
+  was nach `Move/Unbestimmt` wandert) und seit 2026-09-17
+  **`auto-uninteressant`** (Posteingang-Vorstufe). Fehlende legt der Worker beim
+  Start selbst an.
 
 ## Entscheidungen von Helmut
 
@@ -321,6 +324,25 @@ Berechtigungen mitbenutzt.
   `…/ERP`. Wer die ausnehmen will, laesst nur `schoeps.zendesk.com` und die
   Betreff-Marke hart entscheiden; `status.zendesk.com` faende seinen Ordner
   dann ueber die Adress-Statistik (341 Mails, praktisch alle in Zendesk).
+- **Bekannt uninteressante Post wird schon im Posteingang weggeraeumt**
+  (Helmuts Wunsch 2026-09-17: „es gibt noch zu viele uninteressante Mails, die
+  ich nach Move sortieren muss"). Er hat `Posteingang/Move/Spam, uninteressant`
+  angelegt und 26 Mails hineingezogen; `uninteressant.py` lernt daraus — und nur
+  daraus. **Der Posteingang ist damit erstmals Quelle**, aber nur fuer diese eine
+  Regel: alles andere bleibt liegen, damit Helmut es sieht. Laeuft im Voll-Sync
+  (alle 16 min), nicht im 2-Minuten-Zyklus. Marke `auto-uninteressant`,
+  Schalter `POSTEINGANG_DRY_RUN` (Default 1 = nur protokollieren).
+  **Trockenlauf 2026-09-17:** von den 26 der Lernquelle werden 24 erkannt; die
+  zwei Ausnahmen sind die Netze bei der Arbeit (`dhd.news@dhd-audio.de` —
+  Helmut hat an die Domain geschrieben; `ping@klingklangklong.com` — die Adresse
+  hat 2 Mails in Zielordnern). Im Posteingang **1 Treffer**
+  (`dennis@hellorevenue.me`, „Quiet ads" — derselbe Absender, der gestern
+  markiert wurde: genau der Wiederholungstaeter-Fall). **Gegentest: 0 von 3.814
+  abgelegten Geschaeftsmails** der letzten 12 Monate wuerden weggeraeumt.
+  **Erwarteter Nutzen ehrlich klein:** die 26 markierten Mails stammen aus 70
+  Tagen (~2,6/Woche), und von 213 Mails evidenzloser Domains filtert Exchange
+  185 selbst in den Junk. Der Wert liegt bei den Wiederholungstaetern, die
+  Exchange durchlaesst.
 - **Der Worker legt fehlende Kategorien selbst an.**
 - **Newsletter werden normal einsortiert** (alle Stufen), erzeugen aber nie
   Ordnervorschlaege und zaehlen nicht in die thematische Verdichtung.
@@ -390,7 +412,8 @@ Block-Kit-Buttons mit signiertem Endpunkt hinter Caddy.
 - **`.env`** (chmod 600, Werte in Single-Quotes, nie per `source`):
   `SCHOEPSMAIL_DB_PASSWORD`, `GRAPH_CLIENT_SECRET`, `GRAPH_SECRET_ABLAUF`
   (`2028-09-14`), `SLACK_BOT_TOKEN`, `ANTHROPIC_API_KEY` (derselbe wie LifeOS),
-  Schalter `DRY_RUN='0'`, `NACHZIEHER_DRY_RUN='0'`, `SORTIERER_KI` (fehlt = 0).
+  Schalter `DRY_RUN='0'`, `NACHZIEHER_DRY_RUN='0'`, `SORTIERER_KI` (fehlt = 0),
+  `POSTEINGANG_DRY_RUN` (fehlt = 1, Posteingang-Vorstufe protokolliert nur).
   **Die .env wird nur beim Erzeugen des Containers gelesen** — nach einer
   Aenderung `docker compose up -d worker`, ein `restart` reicht nicht.
 - **Deploy von Code:** `cd /opt/schoeps-mail && git pull && docker compose restart
