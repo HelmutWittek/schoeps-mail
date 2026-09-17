@@ -26,9 +26,12 @@ eine falsch weggeraeumte Mail dort echten Schaden macht:
    die entscheidet. `dhd.news@dhd-audio.de` (Newsletter, als Spam markiert) hat
    0 Evidenz, die Domain `dhd-audio.de` aber 6: die Adress-Regel greift, die
    Domain-Regel nicht.
-3. Hat Helmut je an diese Adresse oder Domain geschrieben, gilt sie als
-   Geschaeftskontakt. Gemessen: bei allen 16 Top-Kandidaten 0 gesendete Mails —
-   das Netz kostet also nichts und faengt den Fall, wenn er kommt.
+3. Hat Helmut je an DIESE ADRESSE geschrieben, gilt sie als Geschaeftskontakt.
+   Nur die Adresse, nicht die Domain (Entscheidung Helmut 2026-09-17): an einen
+   Menschen bei DHD Audio zu schreiben macht dessen Newsletter-Absender
+   `dhd.news@dhd-audio.de` nicht zum Kontakt. Gemessen: bei allen 16
+   Top-Kandidaten 0 gesendete Mails — das Netz kostet nichts und faengt den
+   Fall, wenn er kommt.
 4. Laeuft ein Dialog (die `conversationId` taucht in den Gesendeten auf), bleibt
    die Mail liegen, auch wenn der Absender markiert war.
 """
@@ -51,15 +54,20 @@ SPAM_PFAD = os.getenv("SPAM_PFAD", "Posteingang/Move/Spam, uninteressant")
 SPAM_MIN_DOMAIN = int(os.getenv("SPAM_MIN_DOMAIN", "2"))
 
 
-async def _hat_gesendet(s: AsyncSession, adresse: str, domain: str) -> bool:
-    """Hat Helmut je an diese Adresse oder Domain geschrieben? (Netz 3)"""
+async def _hat_gesendet(s: AsyncSession, adresse: str) -> bool:
+    """Hat Helmut je an DIESE ADRESSE geschrieben? (Netz 3)
+
+    Nur die Adresse, nicht die Domain — Entscheidung Helmut 2026-09-17. Die
+    Domain war zu grob: an einen Menschen bei DHD Audio zu schreiben macht
+    dessen Newsletter-Absender (`dhd.news@dhd-audio.de`) nicht zum
+    Geschaeftskontakt. Genau dieser Fall blieb im Trockenlauf haengen.
+    """
     r = await s.execute(text("""
         SELECT EXISTS (
             SELECT 1 FROM mail g JOIN ordner o ON o.id = g.ordner_id
              WHERE o.pfad = 'Gesendete Elemente' AND g.an IS NOT NULL
-               AND EXISTS (SELECT 1 FROM unnest(g.an) a
-                            WHERE lower(a) = :adr OR lower(a) LIKE :dom))
-    """), {"adr": adresse, "dom": "%@" + domain if domain else "%@\x00"})
+               AND EXISTS (SELECT 1 FROM unnest(g.an) a WHERE lower(a) = :adr))
+    """), {"adr": adresse})
     return bool(r.scalar())
 
 
@@ -96,7 +104,7 @@ async def pruefe(s: AsyncSession, mail: dict[str, Any]) -> str | None:
     if not treffer:
         return None
 
-    if await _hat_gesendet(s, adresse, domain):  # Netz 3
+    if await _hat_gesendet(s, adresse):  # Netz 3
         log.info("Uninteressant-Regel gestoppt: an %s wurde schon geschrieben", adresse)
         return None
 
