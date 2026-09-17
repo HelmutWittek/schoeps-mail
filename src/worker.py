@@ -8,6 +8,7 @@ Jeder VOLL_SYNC_ALLE-te Zyklus (Default 8 → alle 16 min) zusaetzlich:
   3. Ordnerbaum spiegeln + Delta ueber alle Ordner (haelt die Evidenz frisch;
      Helmuts Handarbeit im Client wird so zur Regel).
   4. Ordnerprofile auffrischen, wenn faellig.
+  5. Outlook-Posteingangsregeln spiegeln (`outlook_regeln`, nur lesend).
 
 Heartbeats `sortierer` (jeder Zyklus) und `index` (Voll-Sync). Ab drei
 Fehlern in Folge geht ein Slack-Alarm, gedrosselt auf einen je Stunde. Beim
@@ -21,7 +22,7 @@ import logging
 import os
 from datetime import date
 
-from src import index, llm, nachzieher, profil, slack, sortierer
+from src import index, llm, nachzieher, outlook_regeln, profil, slack, sortierer
 from src.graph import Graph
 from src.heartbeat import record_failure, record_success
 
@@ -69,6 +70,15 @@ async def voll_sync(graph: Graph) -> int:
             log.info("Nachzieher: %s", dict(z))
     except Exception:  # noqa: BLE001 — darf den Sync nicht kosten
         log.exception("Nachzieher fehlgeschlagen")
+    # Outlook-Posteingangsregeln spiegeln. Sie greifen bei der Zustellung, also
+    # vor allem, was hier passiert — ohne den Spiegel bliebe diese zweite
+    # Automatik unsichtbar. Nur lesen, geaendert wird im Postfach.
+    try:
+        z = await outlook_regeln.spiegle(graph)
+        if z.get("neu") or z.get("geaendert") or z.get("verschwunden"):
+            log.info("Outlook-Regeln: %s", dict(z))
+    except Exception:  # noqa: BLE001 — darf den Sync nicht kosten
+        log.exception("Regel-Spiegel fehlgeschlagen")
     # Grobe Vorstufe: bekannt uninteressante Post aus dem Posteingang wegraeumen.
     # Erst hier, nicht im 2-Minuten-Zyklus — der Posteingang ist gerade frisch
     # synchronisiert, und der Eingriff in Helmuts Arbeitsplatz soll selten sein.

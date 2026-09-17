@@ -266,3 +266,15 @@ class Graph:
     async def lege_kategorie_an(self, name: str, farbe: str) -> None:
         await self._anfrage("POST", "/outlook/masterCategories",
                             json={"displayName": name, "color": farbe}, wiederholen=False)
+
+    # ---------------------------------------------------- Posteingangsregeln
+    async def posteingangs_regeln(self) -> list[dict[str, Any]]:
+        """Die serverseitigen Regeln des Postfachs (`mailFolders/inbox/messageRules`).
+
+        Braucht `MailboxSettings.Read(Write)`. Nur Posteingangsregeln — reine
+        Client-Regeln von Outlook Desktop liegen nicht im Postfach und sind hier
+        unsichtbar. Sie laufen bei der Zustellung, also vor allem, was dieser
+        Worker tut.
+        """
+        d = await self.get("/mailFolders/inbox/messageRules")
+        return d.get("value", [])
