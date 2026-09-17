@@ -332,13 +332,27 @@ Berechtigungen mitbenutzt.
   Regel: alles andere bleibt liegen, damit Helmut es sieht. Laeuft im Voll-Sync
   (alle 16 min), nicht im 2-Minuten-Zyklus. Marke `auto-uninteressant`,
   Schalter `POSTEINGANG_DRY_RUN` (Default 1 = nur protokollieren).
-  **Trockenlauf 2026-09-17:** von den 26 der Lernquelle werden 24 erkannt; die
-  zwei Ausnahmen sind die Netze bei der Arbeit (`dhd.news@dhd-audio.de` —
-  Helmut hat an die Domain geschrieben; `ping@klingklangklong.com` — die Adresse
-  hat 2 Mails in Zielordnern). Im Posteingang **1 Treffer**
-  (`dennis@hellorevenue.me`, „Quiet ads" — derselbe Absender, der gestern
-  markiert wurde: genau der Wiederholungstaeter-Fall). **Gegentest: 0 von 3.814
-  abgelegten Geschaeftsmails** der letzten 12 Monate wuerden weggeraeumt.
+  **Scharf seit 2026-09-17 10:14** (`POSTEINGANG_DRY_RUN='0'`); erster Lauf:
+  1 Mail bewegt, 0 Fehler, per Graph gegengeprueft (Ordner und Kategorie
+  stimmen, Posteingang 31 → 30).
+  **Netz 3 prueft nur die ADRESSE, nicht die Domain** (Helmut 2026-09-17): an
+  einen Menschen bei DHD Audio zu schreiben macht dessen Newsletter-Absender
+  nicht zum Geschaeftskontakt.
+  **Helmut korrigiert ueber einen eigenen Zielordner:** er hat 7 der 26 Mails
+  aus dem Spam-Ordner nach `❸ Vertrieb/Bekannte, Branche/Newsletter,
+  Branchennews` gezogen (`dhd.news@dhd-audio.de`, `news@galaxyworld.news`,
+  `newsletter@audionerds.org`, `no-reply@news.lawo.com`,
+  `ping@klingklangklong.com`) — „damit die da nicht landen". Das wirkt von
+  selbst: der Ordner ist ein Zielordner, die Absender haben damit Evidenz, und
+  Netz 2 sperrt sie. **Die Korrektur braucht keinen Code, nur eine
+  Handbewegung.** Lehre fuer aehnliche Faelle: ein Zielordner fuer „interessant,
+  aber gesammelt" ist der richtige Hebel, keine Ausnahmeliste.
+  **Trockenlauf danach (2026-09-17, Index frisch gezogen):** Lernquelle
+  **19 von 19** erkannt, **Newsletter-Ordner 0 von 7** (die bleiben dort),
+  Posteingang **1 Treffer**, **Gegentest 0 von 3.822** abgelegten
+  Geschaeftsmails der letzten 12 Monate.
+  *Slack-Meldung fuer den Spam-Ordner hat Helmut abgelehnt (2026-09-17) — nicht
+  erneut vorschlagen.*
   **Erwarteter Nutzen ehrlich klein:** die 26 markierten Mails stammen aus 70
   Tagen (~2,6/Woche), und von 213 Mails evidenzloser Domains filtert Exchange
   185 selbst in den Junk. Der Wert liegt bei den Wiederholungstaetern, die
@@ -413,7 +427,8 @@ Block-Kit-Buttons mit signiertem Endpunkt hinter Caddy.
   `SCHOEPSMAIL_DB_PASSWORD`, `GRAPH_CLIENT_SECRET`, `GRAPH_SECRET_ABLAUF`
   (`2028-09-14`), `SLACK_BOT_TOKEN`, `ANTHROPIC_API_KEY` (derselbe wie LifeOS),
   Schalter `DRY_RUN='0'`, `NACHZIEHER_DRY_RUN='0'`, `SORTIERER_KI` (fehlt = 0),
-  `POSTEINGANG_DRY_RUN` (fehlt = 1, Posteingang-Vorstufe protokolliert nur).
+  `POSTEINGANG_DRY_RUN='0'` (seit 2026-09-17 10:14 scharf; fehlt = 1 = nur
+  protokollieren).
   **Die .env wird nur beim Erzeugen des Containers gelesen** — nach einer
   Aenderung `docker compose up -d worker`, ein `restart` reicht nicht.
 - **Deploy von Code:** `cd /opt/schoeps-mail && git pull && docker compose restart
