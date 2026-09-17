@@ -37,8 +37,10 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 | `migrations/001_index.sql` | `ordner`, `mail`, Sicht `mail_evidenz` (Gewicht Hand=2/auto=1), `regel_entscheidung`, `worker_heartbeat` |
 | `migrations/002_evidenz_betreff.sql` | `betreff` in der Evidenz-Sicht + Ausdrucks-Index fuer die Betreff-Marke |
 | `migrations/003_mail_bewegung.sql` | **Bewegungslog**: jeder Ordnerwechsel, `quelle` `'hand'` (per Delta gesehen) oder `'worker'` (eigener Move, in `sortierer.verschiebe` geschrieben — der Index sieht die Mail danach schon im Ziel und meldet keinen Wechsel). Graph kennt kein „wer"; das Audit-Log von Exchange waere Purview-only mit 24 h Verzug |
+| `src/outlook_regeln.py` | **Spiegel der Outlook-Posteingangsregeln (seit 2026-09-17):** `spiegle()` holt `mailFolders/inbox/messageRules` (nur lesend, geaendert wird im Postfach), `hygiene()` haelt sie gegen die Ablage-Historie — Ziel geloescht, leer, doppelt, Widerspruch, Wissen ohne Evidenz, eingeschlafen |
+| `migrations/005_outlook_regel.sql` | Tabelle `outlook_regel` + Sicht `outlook_regel_absender` (je Absenderangabe einer Regel eine Zeile; `sentToAddresses` bewusst nicht) |
 | `migrations/004_betreff_tag_ci.sql` | Marken-Index case-insensitiv (`Re:` neben `RE:`); Ausdruck buchstabengleich zu `regel.nach_betreff_tag` |
-| `scripts/` | `index_lauf.py`, `profil_lauf.py`, `trockenlauf.py` (Messung, `--nur-ki`), `intern_verteilen.py` (Sammelordner aufloesen), `test_regel.py` + `test_absender_pruefung.py` (40 + 47 Pruefungen ohne DB) |
+| `scripts/` | `index_lauf.py`, `profil_lauf.py`, `trockenlauf.py` (Messung, `--nur-ki`), `intern_verteilen.py` (Sammelordner aufloesen), `regel_bericht.py` (Outlook-Regeln spiegeln + Hygiene), `test_regel.py` + `test_absender_pruefung.py` (40 + 47 Pruefungen ohne DB) |
 
 **Juengste-Hand-Regel** (`regel.nach_juengster_hand`, vor der Adress-Statistik, nicht fuer
 eigene Domain): zeigen die letzten `REGEL_JUENGSTE_HAND_N`=3 Handbewegungen von Mails
@@ -264,6 +266,44 @@ Berechtigungen mitbenutzt.
   **`auto-uninteressant`** (Posteingang-Vorstufe). Fehlende legt der Worker beim
   Start selbst an.
 
+## Outlook-Posteingangsregeln (Befund 2026-09-17)
+
+Im Postfach laeuft eine **zweite Automatik**, die es laenger gibt als dieses
+Projekt und die bis heute nirgends auftauchte: **175 Posteingangsregeln**, 108
+aktiv, 67 aus. Sie sind serverseitig (`mailFolders/inbox/messageRules`, lesbar
+und schreibbar mit `MailboxSettings.ReadWrite` — reine Client-Regeln von
+Outlook Desktop laegen nicht im Postfach und waeren unsichtbar; hier gibt es
+keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
+
+- **Arbeitsteilung, die daraus folgt:** Regeln machen das Strukturelle bei der
+  Zustellung — Ticketsysteme, Listen, Automaten und vor allem die
+  Nachrichtenklassen, die nur Exchange kennt (`isMeetingResponse`,
+  `isAutomaticReply`, `isNonDeliveryReport`, `isReadReceipt`). Der Index sieht
+  davon nichts, er kennt nur den Betreff. Alles Thematische macht der Worker.
+- **Die Statistik hat die Regeln laengst mitgelernt.** Eine per Regel abgelegte
+  Mail kommt ohne `auto-*`-Kategorie an und zaehlt in `mail_evidenz` mit
+  Gewicht 2, also wie eine Handablage. Richtig so — eine Regel ist Helmuts Hand,
+  nur vorab niedergeschrieben — erklaert aber die sehr scharfen Absenderprofile
+  mancher Ordner (`❹ Marketing/Presse`: 40 Regeln).
+- **Bestand:** 139 reine Absenderregeln, 15 Betreff, 10 „Absender enthaelt",
+  9 Empfaenger; 172x verschieben, 140x `stopProcessingRules`, **1x
+  Weiterleitung** (1&1-Rechnungen an `Einkauf@schoeps.de`).
+- **Hygienebefunde des ersten Laufs** (`scripts/regel_bericht.py`): 0 Regeln mit
+  gelöschtem Ziel, 2 leere (beide aus), 29 von Outlook als fehlerhaft gemeldete
+  (alle aus, Ziele existieren — Altlast), 1 Adresse in zwei Regeln mit
+  verschiedenen Zielen (`applusgo@assecosol.com`), **2 Widersprueche zur
+  tatsaechlichen Ablage** (Regel legt in den Elternordner, Helmut legt in den
+  Unterordner: `applusgo@assecosol.com` → `…/ERP` vs. `…/ERP/Ap+ Go` bei 99 %
+  von 244; `webmail@plugin-alliance.com` → `…/Plug-in Upmix` vs.
+  `…/Plug-in Upmix /plugin alliance` bei 100 % von 88), **46 aktive
+  Regel-Absender ohne jede Evidenz** und **69 eingeschlafene** (seit ueber zwei
+  Jahren keine Mail, die meisten davon nie eine). Von 88 Adressen aktiver
+  Regeln wirkt also nur ein Bruchteil; der Rest ist Presse-Karteileiche.
+- **Was daraus noch nicht gebaut ist:** die 46 Absender ohne Evidenz sind
+  Wissen, das nur in der Regel steht — die Kaskade kommt nicht darauf. Eine
+  Stufe „Regel-Zuordnung" waere moeglich, lohnt aber erst, wenn solche Absender
+  wirklich in `Move` auftauchen (bisher nicht beobachtet). Erst messen.
+
 ## Entscheidungen von Helmut
 
 - **Datenhaltung freigegeben (2026-09-14):** Metadaten + Vorschauen auf dem VPS,
@@ -357,6 +397,18 @@ Berechtigungen mitbenutzt.
   Tagen (~2,6/Woche), und von 213 Mails evidenzloser Domains filtert Exchange
   185 selbst in den Junk. Der Wert liegt bei den Wiederholungstaetern, die
   Exchange durchlaesst.
+- **Besprechungsantworten gehen per Outlook-Regel nach `Posteingang/Einladungen`**
+  (2026-09-17, auf Helmuts „Antworten auf Einladungen fluten den Posteingang").
+  Regel `Besprechungsantworten (automatisch)`, Sequenz 1, Bedingung
+  `isMeetingResponse: true`, `stopProcessingRules`. Eine Bedingung fuer alle
+  Wortformen (Angenommen/Accepted/Tentative/…), die der Worker nicht haben kann
+  — der Index kennt nur den Betreff, nicht die Nachrichtenklasse. Gemessen
+  vorher: 21 Besprechungsantworten, 12 Absagen, 5 Abwesenheitsnotizen in 120
+  Tagen, also 2–3 pro Woche; 14 lagen schon in `Einladungen`, 14 in
+  `SCHOEPS intern`. Beim Anlegen rutschten alle 174 bestehenden Regeln um genau
+  eine Sequenz nach hinten, die Reihenfolge untereinander blieb gleich
+  (gegengeprueft). Die Kalender-Verfolgung macht Exchange beim Zustellen, der
+  Ordner aendert daran nichts — nach der ersten echten Antwort gegenpruefen.
 - **Der Worker legt fehlende Kategorien selbst an.**
 - **Newsletter werden normal einsortiert** (alle Stufen), erzeugen aber nie
   Ordnervorschlaege und zaehlen nicht in die thematische Verdichtung.
@@ -435,7 +487,7 @@ Block-Kit-Buttons mit signiertem Endpunkt hinter Caddy.
   worker` — `src/`, `scripts/`, `migrations/` sind Bind-Mounts, kein Build noetig.
   Build nur bei `requirements.txt`/`Dockerfile`. Migrationen von Hand:
   `docker exec -i lifeos-postgres psql -U schoepsmail -d schoepsmail <
-  migrations/00N_x.sql` — eingespielt: 001, 002, 003, 004.
+  migrations/00N_x.sql` — eingespielt: 001, 002, 003, 004, 005.
 - **Skripte:** `docker compose run --rm -T --no-deps worker python scripts/<x>.py`
   (`PYTHONPATH=/app` steht in Compose und Dockerfile, `PYTHONUTF8=1` wegen `❶`).
 - **Beobachten:** `docker compose logs -f worker`; `worker_heartbeat` (`sortierer`
@@ -443,7 +495,7 @@ Block-Kit-Buttons mit signiertem Endpunkt hinter Caddy.
   `ausgefuehrt`/`dry_run`); `mail_bewegung` (hand/worker). Slack-Alarm in
   `#mail-sortierer` ab 3 Fehlzyklen in Folge und 30 Tage vor Secret-Ablauf,
   gedrosselt auf einen je Stunde und Schluessel.
-- **Takt:** Move alle 120 s, Voll-Sync + Profile + Nachzieher alle 8 Zyklen (16 min).
+- **Takt:** Move alle 120 s, Voll-Sync + Profile + Nachzieher + Regel-Spiegel alle 8 Zyklen (16 min).
   Handbewegungen werden also mit bis zu 16 min Verzug erkannt.
 
 ## Parallele Sessions (seit 2026-09-15)
@@ -587,6 +639,11 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   harten Stufe 0 nicht mehr; ohne sie waeren es 17 von 25 (68 %). Ein neuer
   `--nur-ki`-Lauf misst jetzt sauberer. **Offen bleibt derselbe Konflikt fuer
   `Redmine, Planio, Slite`** — dort ist nichts entschieden.
+- **Regelhygiene im Postfach** (Befund oben, Aufraeumen ist Helmuts Entscheidung):
+  2 Widersprueche (Regel legt in den Elternordner, er selbst in den Unterordner),
+  1 doppelt belegte Adresse, 2 leere und 29 als fehlerhaft gemeldete Regeln
+  (alle aus), 69 eingeschlafene. Der Bericht laeuft auf Zuruf, es meldet nichts
+  von selbst — ein Slack-Push waere Phase 4.
 - **Phase 4:** Ordnervorschlaege A–C, Slack-Push mit Link, Bestaetigungsseite
   hinter Caddy (Basic Auth), Profile editierbar, Nachzieher-Vorschlaege fuer
   Geschwister in anderen Themenordnern.
@@ -630,6 +687,8 @@ nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenz
   lassen; `-e ANTHROPIC_MODELL=claude-sonnet-5` fuer den Modellvergleich.
 - `intern_verteilen.py [--ohne-ki] [--ausfuehren] [--limit] [--monate]` —
   Sammelordner aufloesen, Trockenlauf als Default.
+- `regel_bericht.py [--nur-bericht]` — Outlook-Posteingangsregeln spiegeln und
+  gegen die Ablage-Historie halten. `--nur-bericht` liest nur die DB.
 - `test_regel.py` — Logik-Tests ohne DB (40 Pruefungen, inkl. harte Ablage).
 - `test_absender_pruefung.py` — Vorfilter, `ziel_leer`, `nach_unbestimmt`, `normpfad` (47 Pruefungen ohne DB).
 - Phase 0: `graph_app_test.py` (Client-Credentials, Ordnerbaum, Negativtest,
