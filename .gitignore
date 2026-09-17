@@ -1,5 +1,9 @@
 # Geheimnisse liegen nie im Repo: Secret und Tokens kommen ueber die .env auf dem VPS.
-.env
+# `.env*` deckt auch Sicherungen ab: `.env.bak.20260917` fiel am 2026-09-17
+# durch `.env` UND `*.env` (das Muster verlangt die Endung) und lag untracked
+# im Repo-Verzeichnis auf dem VPS — ein `git add -A` einer parallelen Session
+# haette die Secrets ins oeffentliche Repo gepusht.
+.env*
 *.env
 *.token
 *_secret*
