@@ -15,6 +15,7 @@ Urteil gleich und wird so nur einmal je fuenf Minuten voll bezahlt.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Any
 
@@ -84,6 +85,26 @@ REGEL_AKQUISE = (
     "Einladungen zu Veranstaltungen der Audio-Branche — die gehoeren in ihren Ordner."
 )
 
+# Helmut 2026-10-05: „sei immer so spezifisch wie du sein kannst". Ersetzt die
+# fruehere Regel „Eltern- und Unterordner beide nahe → unsicher", die genau in
+# die Gegenrichtung zog. Eigene Konstante wie REGEL_AKQUISE; mit
+# URTEIL_REGEL_SPEZIFISCH=0 gilt fuer einen Messlauf die alte Fassung.
+REGEL_SPEZIFISCH = (
+    "- Waehle immer den SPEZIFISCHSTEN Ordner, zu dem die Mail einen erkennbaren Bezug "
+    "hat. Beispiel: eine Bahn- oder Hotelbuchung, deren Datum, Ort oder Anlass zu einer "
+    "Veranstaltung, Messe, einem Termin oder Projekt passt, gehoert in DEREN Ordner; nur "
+    "ohne solchen Bezug in den allgemeinen Reise-Ordner. Ebenso: nennt die Mail ein "
+    "Produkt, Projekt, eine Firma oder Stelle, fuer die es einen Unterordner gibt, nimm "
+    "den Unterordner; den Elternordner nur, wenn kein Unterordner passt. Die Profile "
+    "sagen dir, wofuer jeder Unterordner steht.\n"
+    if os.getenv("URTEIL_REGEL_SPEZIFISCH", "1") != "0" else
+    "- Liegen ein Ordner und sein Unterordner (z.B. 'Ausstellung/AES' und "
+    "'Ausstellung/AES/TC') oder zwei Geschwisterordner desselben Bereichs beide nahe, "
+    "ist das `unsicher` — ausser die Mail nennt den Gegenstand des einen ausdruecklich "
+    "(Produktname, Projektname, Veranstaltung, Firma). Die Profile sagen dir, was den "
+    "Unterordner vom Elternordner unterscheidet.\n"
+)
+
 REGELN = (
     "Du sortierst eingehende E-Mails eines Mitarbeiters der SCHOEPS Mikrofone GmbH "
     "(Karlsruhe, Hersteller von Studiomikrofonen) in seine bestehenden Ordner. "
@@ -95,11 +116,7 @@ REGELN = (
     "- Waehle GENAU EINEN Pfad aus der Liste, buchstabengetreu. Erfinde keinen Ordner.\n"
     "- `sicher` nur, wenn Thema UND Kontext eindeutig zu diesem Ordner passen und kein "
     "anderer Ordner ernsthaft in Frage kommt. Im Zweifel `unsicher`.\n"
-    "- Liegen ein Ordner und sein Unterordner (z.B. 'Ausstellung/AES' und "
-    "'Ausstellung/AES/TC') oder zwei Geschwisterordner desselben Bereichs beide nahe, "
-    "ist das `unsicher` — ausser die Mail nennt den Gegenstand des einen ausdruecklich "
-    "(Produktname, Projektname, Veranstaltung, Firma). Die Profile sagen dir, was den "
-    "Unterordner vom Elternordner unterscheidet.\n"
+    + REGEL_SPEZIFISCH +
     "- Ein Kandidat aus dem Thread ist ein starker Anhaltspunkt: dieselbe Konversation "
     "liegt schon dort. Weiche nur ab, wenn die Mail erkennbar ein anderes Thema hat.\n"
     "- Passt die Mail in keinen bestehenden Ordner, antworte `nirgends` mit leerem Pfad.\n"
