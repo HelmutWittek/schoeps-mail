@@ -62,7 +62,12 @@ pruefe(regel.auswerten([("o1", "A", 1.0)], 0.8, 1.0) is not None, "Thread-Schwel
 
 # Kaskaden-Hilfen
 pruefe(kaskade.bewegt({"stufe": "adresse", "ordner_id": "x"}), "Statistik bewegt")
-pruefe(kaskade.bewegt({"stufe": "ki", "ordner_id": "x", "sicherheit": "sicher"}), "KI sicher bewegt")
+# KI-`sicher` bewegt nur voll scharf (KI_SICHER_BEWEGT=1, Default seit 2026-10-05 aus)
+kaskade.KI_SICHER_BEWEGT = True
+pruefe(kaskade.bewegt({"stufe": "ki", "ordner_id": "x", "sicherheit": "sicher"}), "KI sicher bewegt (voll scharf)")
+kaskade.KI_SICHER_BEWEGT = False
+pruefe(not kaskade.bewegt({"stufe": "ki", "ordner_id": "x", "sicherheit": "sicher"}),
+       "KI sicher bewegt halbscharf nicht")
 pruefe(not kaskade.bewegt({"stufe": "ki", "ordner_id": "x", "sicherheit": "unsicher"}), "KI unsicher bewegt nicht")
 pruefe(not kaskade.bewegt({"stufe": "unklar", "ordner_id": None}), "unklar bewegt nicht")
 pruefe(kaskade.kategorie({"stufe": "domain"}) == "auto-regel" and kaskade.kategorie({"stufe": "thread"}) == "auto-thread",
