@@ -102,6 +102,9 @@ pruefe(regel.harte_ablage("schoeps.de", "KI Jourfixe", None) is None,
        "ohne Nachrichtentyp keine Einladung — der Betreff allein entscheidet nie")
 pruefe(regel.harte_ablage("schoeps.de", "Neue Buchung: Carl Denne", None)["name"] == "einladung",
        "Bookings-Benachrichtigung geht zu den Einladungen")
+pruefe(regel.harte_ablage("schoeps.de", "Stornierte Buchung: X", None)["name"] == "einladung"
+       and regel.harte_ablage("schoeps.de", "New booking: X", None)["name"] == "einladung",
+       "Bookings-Varianten (storniert, englisch) ebenso")
 pruefe(regel.harte_ablage("schoeps.de", "AW: Buchung Saal", None) is None,
        "Betreff-Anfang greift nur am Anfang")
 

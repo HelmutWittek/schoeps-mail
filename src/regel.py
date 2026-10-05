@@ -237,7 +237,9 @@ HARTE_ABLAGE: list[dict[str, Any]] = [
         "typ_praefix": "eventMessage",
         # Bookings-Benachrichtigungen sind gewoehnliche Mails, gehoeren aber dazu
         # (Helmut 2026-10-05).
-        "betreff_anfaenge": ("neue buchung:",),
+        "betreff_anfaenge": ("neue buchung:", "aktualisierte buchung:", "stornierte buchung:",
+                             "new booking:", "updated booking:", "cancelled booking:",
+                             "canceled booking:"),
     },
     # Feste Regeln aus der Move-Durchsicht vom 2026-10-05 („je mehr stumpfe
     # Regeln, desto besser"). Bewusst im Worker und NICHT als Outlook-Regel:
