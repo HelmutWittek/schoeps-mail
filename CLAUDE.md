@@ -647,13 +647,28 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   schaerfen (`Reisen, Bahn`, `IT`/`Software`/`AI, Automation`, dazu Illusonic
   Partner-vs-Produkt), sonst bleibt die Quote dort. Vorfilter, Akquise-Regel und
   das Wegraeumen nach `Move/Unbestimmt` stehen bereits.
-- **Die KI-Quote ist nach unten verzerrt und sollte neu gemessen werden.** Im
-  Lauf vom 16.09. waren 5 der 13 Fehlgriffe „statt `Posteingang/Zendesk`" und
-  einer „statt `Posteingang/Redmine, Planio, Slite`" — also Sammelordner-
-  Konflikte, keine Themenfehler. Die Zendesk-Faelle erreichen die KI seit der
-  harten Stufe 0 nicht mehr; ohne sie waeren es 17 von 25 (68 %). Ein neuer
-  `--nur-ki`-Lauf misst jetzt sauberer. **Offen bleibt derselbe Konflikt fuer
-  `Redmine, Planio, Slite`** — dort ist nichts entschieden.
+- **Neu gemessen 2026-10-05 (nach Stufe 0, `--nur-ki`, 6 Laeufe auf 3
+  Stichproben à 45–66 Mails):** `sicher` 73 / 70 / 64 % auf derselben
+  Stichprobe (Streuung!), 62 / 59 % und 57 % auf zwei anderen. Die Fehlgriffe
+  sind weiter ueberwiegend Konvention: Bahn/Hotel/Uber im Veranstaltungsordner,
+  GitHub-Belege zwischen `IT`/`Software`/`AI, Automation` (springt in beide
+  Richtungen), Illusonic vs. SuperCMIT, Eltern/Kind bei `❽ Jobs`, dazu 2–3x
+  `Redmine, Planio, Slite` (**dort ist weiter nichts entschieden**). Haiku
+  erfindet stabil `❺ Ausstellung/IBC/2009-2025/2026`.
+- **Halbscharfer Betrieb gebaut (2026-10-05, Vorschlag Claude, Go Helmut zum
+  Konzept):** `KI_SICHER_BEWEGT=0` → die KI raeumt nur weg (`nirgends` →
+  `Move/Unbestimmt`), `sicher` wird nur protokolliert. **Dazu zwei Netze:**
+  (1) `kaskade.letztes_ki_urteil` — ein KI-Urteil gilt `KI_PAUSE_H`=24 h, sonst
+  ginge jede liegende Mail alle 2 min an Haiku (>30.000 Calls/Tag);
+  (2) `absender_pruefung.bekannter_absender` — `nirgends` raeumt nur
+  Erstkontakte weg (nicht eigene Domain, keine Evidenz von Adresse/Domain, nie
+  hingeschrieben, keine Antwort im Thread). Anlass: in den Messlaeufen sagte
+  Haiku 7–8x `nirgends` zu abgelegter Post (Illusonic-Einladung,
+  Kollegen-Weiterleitung, Lemo-Anfrage mit Antwort); mit dem Netz geht davon
+  nur noch eine Toni-ML-Listenmail durch. **Probe am echten Move (68 Mails,
+  nichts bewegt):** 9 → `Unbestimmt` (wispr.ai 3x, printables, JTSE-Werbung,
+  Telefon-Webinar, Ferchau, BMW, 1 ohne Absender), 15 bleiben, 44 nur
+  Protokoll. **Scharf ist es noch nicht** — `SORTIERER_KI` fehlt in der .env.
 - **Regelhygiene im Postfach** (Befund oben, Aufraeumen ist Helmuts Entscheidung):
   2 Widersprueche (Regel legt in den Elternordner, er selbst in den Unterordner),
   1 doppelt belegte Adresse, 2 leere und 29 als fehlerhaft gemeldete Regeln
