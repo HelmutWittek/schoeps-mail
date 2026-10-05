@@ -127,7 +127,7 @@ async def main(pfad: str, limit: int | None, monate: int | None, mit_ki: bool,
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--pfad", default="Posteingang/SCHOEPS intern")
+    p.add_argument("--pfad", default="❻ Verwaltung/SCHOEPS intern nicht zugeordnet")
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--monate", type=int, default=None, help="nur Mails der letzten N Monate")
     p.add_argument("--ohne-ki", action="store_true")

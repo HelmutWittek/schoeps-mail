@@ -77,8 +77,16 @@ ARBEITS_PFADE |= ALTABLAGE_PFADE
 # ebenfalls Sammelordner; Helmut hat das zurueckgenommen: er DARF Ziel sein,
 # fuer Benachrichtigungen dieser Werkzeuge. Die gehen jetzt ueber die harte
 # Ablage (regel.HARTE_ABLAGE, Eintrag `redmine`) dorthin.
+#
+# Am 2026-10-05 abends hat Helmut den aufgeraeumten Rest verschoben und
+# umbenannt: „❻ Verwaltung/SCHOEPS intern nicht zugeordnet" — „soll kein
+# Zielordner werden". Weil die Liste am PFAD haengt, war er bis zum Nachziehen
+# dieser Zeile ein normaler Zielordner; der Worker alarmiert seitdem, wenn ein
+# Pfad hier im Index fehlt (`fehlende_sonderpfade`).
 SAMMELORDNER_PFADE = {
-    p.strip() for p in os.getenv("SAMMELORDNER_PFADE", "Posteingang/SCHOEPS intern").split("|") if p.strip()
+    p.strip() for p in os.getenv(
+        "SAMMELORDNER_PFADE", "❻ Verwaltung/SCHOEPS intern nicht zugeordnet"
+    ).split("|") if p.strip()
 }
 ARBEITS_PFADE |= SAMMELORDNER_PFADE
 
@@ -134,6 +142,19 @@ def _mail_zeile(m: dict[str, Any]) -> dict[str, Any]:
         "hat_anhang": m.get("hasAttachments"),
         "nachrichtentyp": nachrichtentyp(m),
     }
+
+
+async def fehlende_sonderpfade(s: AsyncSession) -> list[str]:
+    """Sammel- und Altablage-Pfade, die im Index nicht (mehr) existieren.
+
+    Diese Ordner werden ueber den Pfad erkannt. Benennt Helmut einen um, wird
+    er sonst still zum Zielordner und seine Mails zu Evidenz (2026-10-05).
+    """
+    pfade = sorted(SAMMELORDNER_PFADE | ALTABLAGE_PFADE)
+    r = await s.execute(text("SELECT pfad FROM ordner WHERE pfad = ANY(:p) AND verschwunden_am IS NULL"),
+                        {"p": pfade})
+    da = {row[0] for row in r.fetchall()}
+    return [p for p in pfade if p not in da]
 
 
 # ---------------------------------------------------------------- Ordnerbaum

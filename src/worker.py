@@ -62,10 +62,16 @@ async def voll_sync(graph: Graph) -> int:
     # Postfach umbenannt, faellt die Regel sonst still aus (2026-10-05).
     async with get_session() as s:
         fehlend = await regel.fehlende_ziele(s)
+        sonder = await index.fehlende_sonderpfade(s)
     if fehlend:
         meldung = f"Feste Regeln ohne Zielordner (umbenannt?): {', '.join(fehlend)}"
         log.warning(meldung)
         await slack.alarm("regel-ziel", meldung)
+    if sonder:
+        meldung = (f"Sammel-/Altablage-Ordner nicht gefunden (umbenannt?) — sie zaehlen "
+                   f"jetzt als Zielordner: {', '.join(sonder)}")
+        log.warning(meldung)
+        await slack.alarm("sonderpfad", meldung)
     if llm.aktiv():
         try:
             await profil.profil_lauf()
