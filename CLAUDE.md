@@ -439,6 +439,38 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   Outlook-Regeln rutschen. Erster Lauf: 10 Einladungen aus `Move` bewegt
   (Jour fixe, KI-Vortreffen, Mitarbeitergespraech, Jubilaeum, RoHS). **Nicht
   erfasst:** die Bookings-Mails „Neue Buchung: …" — das sind gewoehnliche Mails.
+- **„Je mehr stumpfe Regeln, desto besser"** (Helmut 2026-10-05). Feste
+  Zuordnungen — Outlook-Regel bei der Zustellung, `HARTE_ABLAGE` im Worker —
+  gehen vor Statistik und KI. Wo ein Merkmal eindeutig ist, zuerst eine Regel
+  vorschlagen.
+- **`Posteingang/Redmine, Planio, Slite` ist Sammelordner wie `SCHOEPS intern`**
+  (2026-10-05): nie Ziel, nie Evidenz, Quelle des Nachziehers. Gefuellt wird er
+  von drei Outlook-Regeln (`redmine@schoeps.de`, `hello@slite.com`,
+  `senderContains PLAN.IO`) — „eine Outlook-Regel ist doch gut, braucht nicht von
+  dir gemacht werden". Bestand 4.103 Mails, davon 3.825 von `redmine@schoeps.de`;
+  **keiner der 3.189 Threads hat eine Mail in einem Themenordner**, eine
+  Thread-Verteilung wie bei `SCHOEPS intern` bringt also nichts.
+  *Nebenwirkung, sofort behoben:* ohne den Sammelordner fiel die Domain-Statistik
+  auf die Restevidenz zurueck — `plan.io` 92 % in `❻ …/Software`, `slite.com`
+  95 % in `❻ Verwaltung/Personal/Riekehof Emails`. 3 ZIM-Aufgaben von
+  `no-reply@plan.io` gingen nach `…/Software` (die dritte schon per Adresse, weil
+  die ersten beiden sofort Evidenz waren). Seitdem sind `plan.io` und `slite.com`
+  Anbieter-Domains. Die 3 Mails liegen noch in `…/Software`; richtig waere
+  `❻ Verwaltung/Förderung/ZIM`. **Offen:** `do-not-reply@slite.com`
+  (Erwaehnungen, 28 in 90 Tagen) faellt unter keine Outlook-Regel und bleibt
+  jetzt in Move — die Slite-Regel um diese Adresse erweitern.
+- **„Sei immer so spezifisch wie du sein kannst"** (Helmut 2026-10-05, zu Reisen,
+  GitHub, Illusonic, Jobs): Reisebuchung mit Bezug zu einer Veranstaltung →
+  deren Ordner, sonst `Reisen, Bahn`; Unterordner vor Elternordner. Umgesetzt
+  als `urteil.REGEL_SPEZIFISCH` (ersetzt „Eltern und Kind nahe → unsicher").
+  **A/B an drei Stichproben, gleicher Lauf:** 62,9 / 58,7 / 63,8 % mit, 63,2 /
+  61,2 % ohne Regel — kein messbarer Unterschied. Die Bahn-Buchungen landen
+  weiter in `Reisen, Bahn`: aus Buchungsnummer, Datum und Strecke allein kann
+  die KI keinen Messe- oder Termin-Ordner ableiten. Ein echter Hebel waere der
+  Kalender (`Calendars.Read` ist da): Reisedatum → Termin an dem Tag → Ordner
+  mit passendem Namen als Kandidat. Bei `❽ Jobs` zaehlt die Messung die
+  spezifischere Wahl (Unterordner statt Eltern) als Fehler, weil die Historie
+  den Elternordner hat — die Quote bestraft hier genau, was Helmut will.
 - **KI halbscharf (2026-10-05, Go Helmut):** die KI-Stufe darf wegraeumen
   (`nirgends` bei Erstkontakten → `Move/Unbestimmt`), aber nicht einsortieren.
   Voll scharf erst, wenn `sicher` die 90 % erreicht (`KI_SICHER_BEWEGT='1'`).
