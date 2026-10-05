@@ -409,6 +409,16 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   eine Sequenz nach hinten, die Reihenfolge untereinander blieb gleich
   (gegengeprueft). Die Kalender-Verfolgung macht Exchange beim Zustellen, der
   Ordner aendert daran nichts — nach der ersten echten Antwort gegenpruefen.
+- **Zwei weitere Regeln am 2026-10-05** (Anlass: 68 Mails lagen „unklar" in
+  `Move`, rund 30 davon Kollegen-Post, die Stufe 1 nie entscheidet):
+  `Abwesenheitsanträge (automatisch)`, Sequenz 2, Absender
+  `nichtantworten@schoeps.de` → neuer Ordner `❻ Verwaltung/Personal/Abwesenheiten`
+  (bisher 471 in `SCHOEPS intern` — dorthin legte sie die Regel „Schoeps intern",
+  `senderContains SCHOEPS.DE`, die aber aus ist; seitdem landeten sie im
+  Posteingang). `Besprechungsabsagen (automatisch)`, Sequenz 3, Betreff enthaelt
+  `Abgesagt:`/`Canceled:` → `Posteingang/Einladungen` (60 in 12 Monaten, auch die
+  3 Absagen externer Termine im Bundestag-Ordner wuerden kuenftig dort landen).
+  Neue Einladungen bekommen bewusst keine Regel — die muss Helmut beantworten.
 - **Der Worker legt fehlende Kategorien selbst an.**
 - **Newsletter werden normal einsortiert** (alle Stufen), erzeugen aber nie
   Ordnervorschlaege und zaehlen nicht in die thematische Verdichtung.
