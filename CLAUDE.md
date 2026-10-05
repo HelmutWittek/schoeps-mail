@@ -804,8 +804,12 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   20 `unsicher`, 6 `nirgends`, beim Lesen ~4 von 5 plausibel (keine Quote
   messbar — diese Mails lagen nie in einem Themenordner). **Stichprobe scharf,
   500 Mails (Go Helmut):** 315 KI + 55 Thread bewegt, 0 Fehler, 0,59 USD; danach
-  10 Thread-Geschwister. Graph = Index (2.705). **Wartet auf Helmuts Durchsicht**
-  (Kategorie `auto-ki`), bevor der Rest laeuft.
+  10 Thread-Geschwister. Graph = Index (2.705). Helmut sah durch („nur wenig
+  korrigiert") und gab den Rest frei. **Restlauf 2026-10-05 nachmittags:** 2.705
+  Mails, 1.562 KI + 320 Thread bewegt, 666 `unsicher` und 156 `nirgends` liegen
+  geblieben, 3,21 USD. 1 Fehler: `ErrorMessageSizeExceeded` (Mail zu gross fuer
+  das Setzen der Kategorie, bleibt liegen). **`SCHOEPS intern` danach: 823
+  Mails**, Graph = Index. Von 7.762 am 14.09. sind damit ~89 % verteilt.
 - **`Move/Unbestimmt`** als KI-Warteschlange nutzen, sobald Phase 3 laeuft.
 - **Lokale Geheimnis-Dateien** `C:\PROJEKTE\graph_secret.txt` und
   `C:\PROJEKTE\Slack token.txt` liegen noch — beide stehen in der VPS-.env;
