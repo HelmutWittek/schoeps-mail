@@ -35,13 +35,15 @@ from collections import Counter
 from sqlalchemy import text
 
 from src import kaskade, urteil
+from src.sortierer import verschiebe  # Move, Kategorie, Index, Bewegungslog, Protokoll
 from src.db import get_session
 from src.graph import Graph
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("schoepsmail.verteilen")
 
-FELDER = "m.id, m.ordner_id, m.conversation_id, m.von_adresse, m.von_name, m.von_domain, m.an, m.betreff, m.vorschau, m.empfangen_am, m.kategorien"
+FELDER = ("m.id, m.ordner_id, m.conversation_id, m.von_adresse, m.von_name, m.von_domain, m.an, "
+          "m.betreff, m.vorschau, m.empfangen_am, m.kategorien, m.nachrichtentyp")
 
 
 async def lade_mails(pfad: str, limit: int | None, monate: int | None) -> list[dict]:
@@ -56,19 +58,6 @@ async def lade_mails(pfad: str, limit: int | None, monate: int | None) -> list[d
              {"LIMIT :limit" if limit else ""}
         """), {"pfad": pfad, "monate": monate, **({"limit": limit} if limit else {})})
         return [dict(row._mapping) for row in r.fetchall()]
-
-
-async def verschiebe(graph: Graph, m: dict, e: dict) -> None:
-    """Move + Kategorie in Graph, dann den Index sofort nachziehen."""
-    kat = kaskade.kategorie(e)
-    neue = [k for k in (m.get("kategorien") or []) if not k.startswith("auto-")] + [kat]
-    await graph.setze_kategorien(m["id"], neue)
-    await graph.verschiebe(m["id"], e["ordner_id"])
-    async with get_session() as s:
-        await s.execute(text("""
-            UPDATE mail SET ordner_id = :o, kategorien = :k, aktualisiert_am = now() WHERE id = :id
-        """), {"o": e["ordner_id"], "k": neue, "id": m["id"]})
-        await kaskade.protokolliere(s, m["id"], e, dry_run=False, ausgefuehrt=True)
 
 
 async def main(pfad: str, limit: int | None, monate: int | None, mit_ki: bool,
@@ -116,7 +105,7 @@ async def main(pfad: str, limit: int | None, monate: int | None, mit_ki: bool,
     print("\nErgebnis je Stufe:")
     for k, v in sorted(zaehler.items(), key=lambda kv: -kv[1]):
         print(f"  {k:<14}{v:>6}")
-    waere = sum(v for k, v in zaehler.items() if k in ("adresse", "domain", "thread", "ki/sicher"))
+    waere = sum(v for k, v in zaehler.items() if k in ("hart", "adresse", "domain", "thread", "ki/sicher"))
     print(f"\n{'Bewegt' if ausfuehren else 'Wuerde bewegen'}: {waere} von {len(mails)} "
           f"({100 * waere / max(len(mails), 1):.0f} %)")
     if mit_ki:
