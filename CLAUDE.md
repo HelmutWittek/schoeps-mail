@@ -443,22 +443,26 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   Zuordnungen — Outlook-Regel bei der Zustellung, `HARTE_ABLAGE` im Worker —
   gehen vor Statistik und KI. Wo ein Merkmal eindeutig ist, zuerst eine Regel
   vorschlagen.
-- **`Posteingang/Redmine, Planio, Slite` ist Sammelordner wie `SCHOEPS intern`**
-  (2026-10-05): nie Ziel, nie Evidenz, Quelle des Nachziehers. Gefuellt wird er
-  von drei Outlook-Regeln (`redmine@schoeps.de`, `hello@slite.com`,
-  `senderContains PLAN.IO`) — „eine Outlook-Regel ist doch gut, braucht nicht von
-  dir gemacht werden". Bestand 4.103 Mails, davon 3.825 von `redmine@schoeps.de`;
-  **keiner der 3.189 Threads hat eine Mail in einem Themenordner**, eine
-  Thread-Verteilung wie bei `SCHOEPS intern` bringt also nichts.
-  *Nebenwirkung, sofort behoben:* ohne den Sammelordner fiel die Domain-Statistik
-  auf die Restevidenz zurueck — `plan.io` 92 % in `❻ …/Software`, `slite.com`
-  95 % in `❻ Verwaltung/Personal/Riekehof Emails`. 3 ZIM-Aufgaben von
-  `no-reply@plan.io` gingen nach `…/Software` (die dritte schon per Adresse, weil
-  die ersten beiden sofort Evidenz waren). Seitdem sind `plan.io` und `slite.com`
-  Anbieter-Domains. Die 3 Mails liegen noch in `…/Software`; richtig waere
-  `❻ Verwaltung/Förderung/ZIM`. **Offen:** `do-not-reply@slite.com`
-  (Erwaehnungen, 28 in 90 Tagen) faellt unter keine Outlook-Regel und bleibt
-  jetzt in Move — die Slite-Regel um diese Adresse erweitern.
+- **`Posteingang/Redmine, Planio, Slite` ist Zielordner** (Helmut 2026-10-05,
+  nach einer Stunde als Sammelordner zurueckgenommen: „darf Ziel sein, fuer
+  solche oder aehnliche Mails"). Gefuellt von drei Outlook-Regeln
+  (`redmine@schoeps.de`, `hello@slite.com`, `senderContains PLAN.IO`) und der
+  harten Ablage `redmine` (Adressen `redmine@schoeps.de`, `no-reply@plan.io`,
+  `do-not-reply@slite.com` — nur Adressen, weil unter `plan.io`/`slite.com`
+  auch Rechnungen und Konto-Post kommen, die in `Personal/Riekehof Emails`
+  liegen). *Lehre aus der Sammelordner-Stunde:* ohne diesen Ordner fiel die
+  Domain-Statistik auf die Restevidenz zurueck (`plan.io` 92 % in
+  `❻ …/Software`, `slite.com` 95 % in `Riekehof Emails`) und bewegte 3
+  ZIM-Aufgaben falsch nach `…/Software` — seitdem sind beide Anbieter-Domains.
+  Die 3 Mails liegen noch dort.
+- **Feste Regeln im Worker, NICHT als Outlook-Regel** (Helmut 2026-10-05: „ich
+  will die Emails einmal im Posteingang sehen, bevor ich sie nach Move
+  verschiebe"). Stufe 0 kennt dafuer Adressen und Betreff-Anfaenge:
+  `ki_dienste` (Claude, OpenAI, Apps-Script-Fehler → `❻ …/AI, Automation`),
+  Bookings („Neue/Aktualisierte/Stornierte Buchung:", „New booking:" …) →
+  `Posteingang/Einladungen`. Erster Lauf: 5 + 2 Mails aus Move.
+- **Kein Kalenderbezug fuer Reisen** (Helmut 2026-10-05: „zu gefaehrlich").
+  Nicht erneut vorschlagen.
 - **„Sei immer so spezifisch wie du sein kannst"** (Helmut 2026-10-05, zu Reisen,
   GitHub, Illusonic, Jobs): Reisebuchung mit Bezug zu einer Veranstaltung →
   deren Ordner, sonst `Reisen, Bahn`; Unterordner vor Elternordner. Umgesetzt
@@ -466,9 +470,8 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   **A/B an drei Stichproben, gleicher Lauf:** 62,9 / 58,7 / 63,8 % mit, 63,2 /
   61,2 / 59,2 % ohne Regel — kein messbarer Unterschied. Die Bahn-Buchungen landen
   weiter in `Reisen, Bahn`: aus Buchungsnummer, Datum und Strecke allein kann
-  die KI keinen Messe- oder Termin-Ordner ableiten. Ein echter Hebel waere der
-  Kalender (`Calendars.Read` ist da): Reisedatum → Termin an dem Tag → Ordner
-  mit passendem Namen als Kandidat. Bei `❽ Jobs` zaehlt die Messung die
+  die KI keinen Messe- oder Termin-Ordner ableiten (den Kalender als Quelle hat
+  Helmut abgelehnt, s.o.). Bei `❽ Jobs` zaehlt die Messung die
   spezifischere Wahl (Unterordner statt Eltern) als Fehler, weil die Historie
   den Elternordner hat — die Quote bestraft hier genau, was Helmut will.
 - **KI halbscharf (2026-10-05, Go Helmut):** die KI-Stufe darf wegraeumen
@@ -742,8 +745,19 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
 - **Phase 4:** Ordnervorschlaege A–C, Slack-Push mit Link, Bestaetigungsseite
   hinter Caddy (Basic Auth), Profile editierbar, Nachzieher-Vorschlaege fuer
   Geschwister in anderen Themenordnern.
-- **`SCHOEPS intern`:** 5.457 Mails warten auf die KI-Verteilung (Weg 2); der
-  Nachzieher leert den Ordner nebenbei ueber Helmuts Handablagen.
+- **`SCHOEPS intern`, zweiter Verteil-Trockenlauf (2026-10-05, ohne KI, nichts
+  bewegt):** 4.988 Mails im Ordner (+ `Done`). Nachrichtentyp vorher
+  nachgetragen: 547 Zusagen, 299 Einladungen, 105 Absagen, 11
+  Kalenderfreigaben. **1.092 gingen hart nach `Einladungen`** (Typ + „Neue
+  Buchung:"), dazu 22 per Thread → 1.114 (22 %); mit den danach ergaenzten
+  Bookings-Varianten ~1.175. **Wartet auf Helmuts Go** (`intern_verteilen.py
+  --ohne-ki --ausfuehren`). Die Thread-Stufe ist ausgeschoepft — Rest sind
+  Kollegen-Diskussionen (fleing 412, gundert 272, schaefer 249, einkauf 241 …),
+  die nur die KI oder Helmuts Hand verteilt. Weitere Kandidaten fuer feste
+  Regeln: „Automatische Antwort:" (34), „Per E-Mail senden"/„Einlesen"/
+  „Verarbeitet" (Scanner?, 50), `1og-entwicklung@` „Attached Image" (54),
+  `mikroforum@schoeps.de` (25). Der Nachzieher leert den Ordner nebenbei ueber
+  Helmuts Handablagen.
 - **`Move/Unbestimmt`** als KI-Warteschlange nutzen, sobald Phase 3 laeuft.
 - **Lokale Geheimnis-Dateien** `C:\PROJEKTE\graph_secret.txt` und
   `C:\PROJEKTE\Slack token.txt` liegen noch — beide stehen in der VPS-.env;
