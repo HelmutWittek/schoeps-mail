@@ -61,7 +61,12 @@ async def lade_mails(pfad: str, limit: int | None, monate: int | None) -> list[d
 
 
 async def main(pfad: str, limit: int | None, monate: int | None, mit_ki: bool,
-               ausfuehren: bool, zeige: int) -> None:
+               ausfuehren: bool, zeige: int, ki_bewegt: bool = False) -> None:
+    # Der Worker laeuft halbscharf (KI_SICHER_BEWEGT=0). Fuer die Verteilung des
+    # Sammelordners nach Thema (Helmut 2026-10-05: „Aufraeumen nach Thema, wenn
+    # moeglich") darf ein `sicher` NUR in diesem Lauf bewegen — ausdruecklich.
+    if ki_bewegt:
+        kaskade.KI_SICHER_BEWEGT = True
     mails = await lade_mails(pfad, limit, monate)
     print(f"{len(mails)} Mails in {pfad!r}"
           f"{f' (letzte {monate} Monate)' if monate else ''}, KI={'an' if mit_ki else 'aus'}, "
@@ -86,7 +91,8 @@ async def main(pfad: str, limit: int | None, monate: int | None, mit_ki: bool,
             if kaskade.bewegt(e):
                 ziele[e["ziel_pfad"]] += 1
                 if len(beispiele) < zeige:
-                    beispiele.append((schl, e["ziel_pfad"], (m["betreff"] or "")[:70]))
+                    beispiele.append((schl, e["ziel_pfad"], (m["betreff"] or "")[:70],
+                                      m.get("von_adresse") or "", (e.get("begruendung") or "")[:160]))
                 if ausfuehren:
                     try:
                         await verschiebe(graph, m, e)
@@ -115,8 +121,8 @@ async def main(pfad: str, limit: int | None, monate: int | None, mit_ki: bool,
         print(f"  {n:>5}  {pfad_}")
     if beispiele:
         print(f"\nBeispiele (max. {zeige}):")
-        for schl, ziel, betreff in beispiele:
-            print(f"  [{schl}] → {ziel}\n      {betreff!r}")
+        for schl, ziel, betreff, von, begr in beispiele:
+            print(f"  [{schl}] → {ziel}\n      {von}  {betreff!r}\n      {begr}")
 
 
 if __name__ == "__main__":
@@ -127,5 +133,7 @@ if __name__ == "__main__":
     p.add_argument("--ohne-ki", action="store_true")
     p.add_argument("--ausfuehren", action="store_true", help="wirklich verschieben (sonst Trockenlauf)")
     p.add_argument("--zeige", type=int, default=25)
+    p.add_argument("--ki-bewegt", action="store_true",
+                   help="KI-`sicher` darf in diesem Lauf bewegen (Worker bleibt halbscharf)")
     a = p.parse_args()
-    asyncio.run(main(a.pfad, a.limit, a.monate, not a.ohne_ki, a.ausfuehren, a.zeige))
+    asyncio.run(main(a.pfad, a.limit, a.monate, not a.ohne_ki, a.ausfuehren, a.zeige, a.ki_bewegt))
