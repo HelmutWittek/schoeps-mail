@@ -281,6 +281,14 @@ HARTE_ABLAGE: list[dict[str, Any]] = [
         "adressen": ("no-reply@email.claude.com", "noreply@email.openai.com",
                      "noreply-apps-scripts-notifications@google.com"),
     },
+    # Power-Automate-Ablauf („Einlesen: …", Helmut 2026-10-05).
+    {
+        "name": "powerautomate",
+        "pfad": os.getenv("MICROSOFT_PFAD", "❻ Verwaltung/Hardware, Software, Netzwerk/Microsoft"),
+        "domains": (),
+        "marken": (),
+        "adressen": ("powerautomate@schoeps.de",),
+    },
 ]
 
 # Auffang-Regeln: wie die harte Ablage, aber erst NACH Stufe 1 und 2 — „wenn
