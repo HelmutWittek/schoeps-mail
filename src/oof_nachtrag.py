@@ -43,15 +43,25 @@ async def _ordner_id(pfad: str) -> str | None:
         return r.scalar()
 
 
-async def _immutable(graph: Graph, rest_ids: list[str]) -> list[str]:
-    """REST-IDs in ImmutableIds umrechnen (`translateExchangeIds`, je 1000)."""
-    aus: list[str] = []
-    for i in range(0, len(rest_ids), 1000):
-        d = await graph._anfrage("POST", "/translateExchangeIds", json={
-            "inputIds": rest_ids[i:i + 1000],
-            "sourceIdType": "restId", "targetIdType": "restImmutableEntryId"})
-        aus += [x["targetId"] for x in d.get("value", []) if x.get("targetId")]
-    return aus
+async def _mit_immutable_id(graph: Graph, ordner_id: str, rest_id: str) -> dict[str, Any] | None:
+    """Mail zur REST-ID der Suche — mit ImmutableId und der Nachrichtenklasse.
+
+    Der Einzelabruf gibt die ID zurueck, mit der man fragt (also wieder die
+    REST-ID), `translateExchangeIds` verweigert der App den Zugriff (403). Ein
+    `$filter` auf die internetMessageId im Ordner liefert dagegen die
+    ImmutableId — und findet, anders als die Ordnerliste, auch die
+    OOF-Notizen. Getestet 2026-10-05.
+    """
+    x = await graph.get(f"/messages/{rest_id}", **{"$select": "internetMessageId"})
+    imid = (x.get("internetMessageId") or "").replace("'", "''")
+    if not imid:
+        return None
+    d = await graph.get(f"/mailFolders/{ordner_id}/messages", **{
+        "$filter": f"internetMessageId eq '{imid}'",
+        "$select": MAIL_FELDER,
+        "$expand": "singleValueExtendedProperties($filter=id eq 'String 0x001A')"})
+    werte = d.get("value", [])
+    return werte[0] if werte else None
 
 
 async def nachtragen(graph: Graph, pfade: list[str]) -> Counter:
@@ -67,17 +77,14 @@ async def nachtragen(graph: Graph, pfade: list[str]) -> Counter:
                                                    **{"$search": q, "$top": "100", "$select": "id"}):
                 such_ids.add(treffer["id"])
         # Die Suche liefert die REST-ID (`AAMk…`), die sich beim Verschieben
-        # aendert — `Prefer: IdType` wirkt dort nicht, und der Einzelabruf gibt
-        # die ID zurueck, mit der man fragt. Also erst umrechnen. (Erster Versuch
-        # am 2026-10-05 schrieb die REST-ID in den Index.)
-        for mid in await _immutable(graph, sorted(such_ids)):
-            m = await graph.get(f"/messages/{mid}", **{
-                "$select": MAIL_FELDER,
-                "$expand": "singleValueExtendedProperties($filter=id eq 'String 0x001A')"})
+        # aendert — `Prefer: IdType` wirkt dort nicht. (Erster Versuch am
+        # 2026-10-05 schrieb die REST-ID in den Index.)
+        for rest_id in sorted(such_ids):
+            m = await _mit_immutable_id(graph, oid, rest_id)
+            if m is None:
+                continue  # Suchindex von Exchange hinkt nach: liegt nicht mehr hier
             klasse = [p.get("value") for p in m.get("singleValueExtendedProperties", [])]
-            # Der Suchindex von Exchange hinkt nach: nur was WIRKLICH noch im
-            # Ordner liegt und die OOF-Klasse traegt.
-            if KLASSE not in klasse or m.get("parentFolderId") != oid:
+            if KLASSE not in klasse:
                 continue
             m["@odata.type"] = f"#microsoft.graph.{TYP}"
             gefunden[m["id"]] = m
