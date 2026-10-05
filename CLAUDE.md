@@ -514,7 +514,7 @@ Block-Kit-Buttons mit signiertem Endpunkt hinter Caddy.
   (`2028-09-14`), `SLACK_BOT_TOKEN`, `ANTHROPIC_API_KEY` (derselbe wie LifeOS),
   Schalter `DRY_RUN='0'`, `NACHZIEHER_DRY_RUN='0'`, `SORTIERER_KI='1'` und
   `KI_SICHER_BEWEGT='0'` (beide seit 2026-10-05, halbscharf; Sicherung der
-  vorherigen .env in `.env.bak-20261005`),
+  vorherigen .env in `/root/schoeps-mail.env.bak-20261005`, nie neben den Code),
   `POSTEINGANG_DRY_RUN='0'` (seit 2026-09-17 10:14 scharf; fehlt = 1 = nur
   protokollieren).
   **Die .env wird nur beim Erzeugen des Containers gelesen** — nach einer
