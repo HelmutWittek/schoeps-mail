@@ -22,7 +22,7 @@ import logging
 import os
 from datetime import date
 
-from src import index, llm, nachzieher, outlook_regeln, profil, regel, slack, sortierer
+from src import index, llm, nachzieher, oof_nachtrag, outlook_regeln, profil, regel, slack, sortierer
 from src.db import get_session
 from src.graph import Graph
 from src.heartbeat import record_failure, record_success
@@ -71,6 +71,14 @@ async def voll_sync(graph: Graph) -> int:
             await profil.profil_lauf()
         except Exception:  # noqa: BLE001 — Profile sind Komfort, kein Muss
             log.exception("Profil-Lauf fehlgeschlagen")
+    # Abwesenheitsnotizen aus dem eigenen Tenant liefert Graph im Delta nicht —
+    # nachtragen, bevor Nachzieher und Sortierer laufen (oof_nachtrag).
+    try:
+        z = await oof_nachtrag.nachtragen(graph, [sortierer.MOVE_PFAD, *sorted(index.SAMMELORDNER_PFADE)])
+        if z.get("gefunden") or z.get("entfernt"):
+            log.info("Abwesenheitsnotizen nachgetragen: %s", dict(z))
+    except Exception:  # noqa: BLE001 — darf den Sync nicht kosten
+        log.exception("OOF-Nachtrag fehlgeschlagen")
     # Nachzieher: Helmuts Handbewegungen seit dem letzten Lauf auf die Quell-
     # Ordner anwenden (eigener Schalter NACHZIEHER_DRY_RUN, Default 1).
     try:
