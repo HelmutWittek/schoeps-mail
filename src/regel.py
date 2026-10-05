@@ -69,11 +69,13 @@ ANBIETER_DOMAINS = {
     "klaviyomail.com", "emarsys.net", "responsys.net", "exacttarget.com",
     # Kollaboration mit Nutzer-Adressen unter geteilter Domain
     "slack.com", "asana.com", "atlassian.net", "planio.com", "docusign.net",
-    # Projekt- und Wiki-Werkzeuge: die Benachrichtigung sagt nichts ueber das
-    # Thema. Bis 2026-10-05 verdeckte der Sammelordner `Redmine, Planio, Slite`
-    # das; als er aus der Evidenz fiel, schickte die Domain-Statistik
-    # ZIM-Projekt-Aufgaben nach `…/Software` (plan.io 92 %) und haette
-    # Slite-Erwaehnungen nach `Personal/Riekehof Emails` geschickt (95 %).
+    # Projekt- und Wiki-Werkzeuge: unter derselben Domain kommen
+    # Benachrichtigungen, Rechnungen und Konto-Post. Gesehen am 2026-10-05, als
+    # `Redmine, Planio, Slite` kurz aus der Evidenz fiel: die Domain-Statistik
+    # schickte ZIM-Aufgaben nach `…/Software` (plan.io 92 %) und haette
+    # Slite-Erwaehnungen nach `Personal/Riekehof Emails` geschickt (95 %). Die
+    # Benachrichtigungen regelt jetzt die harte Ablage (Eintrag `redmine`) per
+    # Adresse; die Domain entscheidet nie.
     "plan.io", "slite.com",
 }
 
@@ -233,34 +235,71 @@ HARTE_ABLAGE: list[dict[str, Any]] = [
         "domains": (),
         "marken": (),
         "typ_praefix": "eventMessage",
+        # Bookings-Benachrichtigungen sind gewoehnliche Mails, gehoeren aber dazu
+        # (Helmut 2026-10-05).
+        "betreff_anfaenge": ("neue buchung:",),
+    },
+    # Feste Regeln aus der Move-Durchsicht vom 2026-10-05 („je mehr stumpfe
+    # Regeln, desto besser"). Bewusst im Worker und NICHT als Outlook-Regel:
+    # Helmut will jede Mail einmal im Posteingang sehen, bevor er sie nach Move
+    # zieht. Stufe 0 wirkt nur auf Move.
+    #
+    # Benachrichtigungen der Projekt-Werkzeuge. Nur die Benachrichtigungs-
+    # Adressen, nicht die Domains: von plan.io und slite.com kommen auch
+    # Rechnungen und Konto-Post (liegen in `Personal/Riekehof Emails`).
+    # `hello@slite.com` und `PLAN.IO` fuellt zusaetzlich eine Outlook-Regel.
+    {
+        "name": "redmine",
+        "pfad": os.getenv("REDMINE_PFAD", "Posteingang/Redmine, Planio, Slite"),
+        "domains": (),
+        "marken": (),
+        "adressen": ("redmine@schoeps.de", "no-reply@plan.io", "do-not-reply@slite.com"),
+    },
+    # Mitteilungen der KI- und Automatisierungsdienste.
+    {
+        "name": "ki_dienste",
+        "pfad": os.getenv("KI_DIENSTE_PFAD", "❻ Verwaltung/Hardware, Software, Netzwerk/AI, Automation"),
+        "domains": (),
+        "marken": (),
+        "adressen": ("no-reply@email.claude.com", "noreply@email.openai.com",
+                     "noreply-apps-scripts-notifications@google.com"),
     },
 ]
 
 
 def harte_ablage(von_domain: str | None, betreff: str | None,
-                 nachrichtentyp: str | None = None) -> dict[str, Any] | None:
+                 nachrichtentyp: str | None = None,
+                 von_adresse: str | None = None) -> dict[str, Any] | None:
     """Greift eine harte Ablage-Regel? Reine Logik, liefert die Regel oder None."""
     kand = domain_kandidaten(von_domain or "")
     tag = betreff_tag(betreff)
+    adresse = (von_adresse or "").strip().lower()
+    betreff_klein = (betreff or "").strip().lower()
     for regel in HARTE_ABLAGE:
         praefix = regel.get("typ_praefix")
         if praefix and nachrichtentyp and nachrichtentyp.startswith(praefix):
             return {**regel, "grund": f"Nachrichtentyp {nachrichtentyp}"}
+        if adresse and adresse in regel.get("adressen", ()):
+            return {**regel, "grund": f"Absender {adresse}"}
         if any(d in kand for d in regel["domains"]):
             return {**regel, "grund": f"Absender-Domain {von_domain}"}
         if tag and tag in regel["marken"]:
             return {**regel, "grund": f"Betreff-Marke {tag}"}
+        anfang = next((a for a in regel.get("betreff_anfaenge", ()) if betreff_klein.startswith(a)), None)
+        if anfang:
+            return {**regel, "grund": f"Betreff beginnt mit {anfang!r}"}
     return None
 
 
 async def nach_harter_ablage(s: AsyncSession, von_domain: str | None, betreff: str | None,
-                             nachrichtentyp: str | None = None) -> dict[str, Any] | None:
+                             nachrichtentyp: str | None = None,
+                             von_adresse: str | None = None) -> dict[str, Any] | None:
     """Stufe 0: Ticket-System erkannt -> fester Zielordner, ohne Statistik.
 
     Fehlt der Zielordner im Index, greift die Regel nicht und die Kaskade
     laeuft normal weiter — nie raten, nie einen Ordner erfinden.
     """
-    treffer = harte_ablage(von_domain, betreff, nachrichtentyp)
+    treffer = harte_ablage(von_domain, betreff, nachrichtentyp, von_adresse)
     if not treffer:
         return None
     r = await s.execute(text("SELECT id FROM ordner WHERE pfad = :p AND verschwunden_am IS NULL"),
@@ -369,7 +408,7 @@ async def entscheide_statistik(s: AsyncSession, von_adresse: str | None, von_dom
     Eigene Domains: nur die strenge Adress-Regel (Systemadressen) und die
     Betreff-Marke — nie die Domain, nie die lockere Adress-Statistik.
     """
-    t = await nach_harter_ablage(s, von_domain, betreff, nachrichtentyp)
+    t = await nach_harter_ablage(s, von_domain, betreff, nachrichtentyp, von_adresse)
     if t:
         return t
     if not von_adresse:

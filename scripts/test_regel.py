@@ -100,8 +100,27 @@ pruefe(regel.harte_ablage("kunde.de", "Abgesagt: Termin", "eventMessage")["name"
        "Absage (eventMessage) trifft hart")
 pruefe(regel.harte_ablage("schoeps.de", "KI Jourfixe", None) is None,
        "ohne Nachrichtentyp keine Einladung — der Betreff allein entscheidet nie")
-pruefe(regel.harte_ablage("schoeps.de", "Neue Buchung: Carl Denne", "message") is None,
-       "gewoehnliche Mail trifft nicht")
+pruefe(regel.harte_ablage("schoeps.de", "Neue Buchung: Carl Denne", None)["name"] == "einladung",
+       "Bookings-Benachrichtigung geht zu den Einladungen")
+pruefe(regel.harte_ablage("schoeps.de", "AW: Buchung Saal", None) is None,
+       "Betreff-Anfang greift nur am Anfang")
+
+# Feste Regeln aus der Move-Durchsicht (2026-10-05)
+pruefe(regel.harte_ablage("plan.io", "[Elektret ZIM-Projekt - Aufgabe #14]", None,
+                          "no-reply@plan.io")["name"] == "redmine", "Planio-Benachrichtigung → Redmine")
+pruefe(regel.harte_ablage("schoeps.de", "x", None, "Redmine@schoeps.de")["name"] == "redmine",
+       "Adresse ohne Ruecksicht auf Gross/Klein")
+pruefe(regel.harte_ablage("slite.com", "Slite - X mentioned you", None,
+                          "do-not-reply@slite.com")["name"] == "redmine", "Slite-Erwaehnung → Redmine")
+pruefe(regel.harte_ablage("plan.io", "[Planio] Ihre Planio-Rechnung", None,
+                          "kundenservice@plan.io") is None, "Planio-Rechnung trifft NICHT (nur Adressen)")
+pruefe(regel.harte_ablage("email.claude.com", "Deprecation notice", None,
+                          "no-reply@email.claude.com")["name"] == "ki_dienste", "Anthropic-Mitteilung → AI")
+pruefe(regel.harte_ablage("google.com", "Summary of failures", None,
+                          "noreply-apps-scripts-notifications@google.com")["name"] == "ki_dienste",
+       "Apps-Script-Fehler → AI")
+pruefe(regel.harte_ablage("google.com", "Sicherheitswarnung", None, "no-reply@accounts.google.com") is None,
+       "andere Google-Adresse trifft nicht")
 pruefe(regel.harte_ablage("sennheiser.com", None) is None, "Wettbewerber trifft nicht")
 pruefe(kaskade.bewegt({"stufe": "hart", "ordner_id": "x"}), "harte Ablage bewegt")
 pruefe(kaskade.kategorie({"stufe": "hart"}) == "auto-regel", "harte Ablage bekommt auto-regel")
