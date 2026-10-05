@@ -461,6 +461,15 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   `ki_dienste` (Claude, OpenAI, Apps-Script-Fehler → `❻ …/AI, Automation`),
   Bookings („Neue/Aktualisierte/Stornierte Buchung:", „New booking:" …) →
   `Posteingang/Einladungen`. Erster Lauf: 5 + 2 Mails aus Move.
+- **`❻ Verwaltung/Personal/Riekehof Emails` ist Altablage** (Helmut 2026-10-05:
+  „darf nie Zielordner sein, ist legacy"). `index.ALTABLAGE_PFADE`: Arbeitsordner
+  (nie Ziel, nie Evidenz, nicht in der KI-Ordnerliste), aber anders als ein
+  Sammelordner keine Quelle des Nachziehers. 808 Mails, ueberwiegend
+  Newsletter und Werkzeug-Post. Gegenprobe vorher: alle Absender darin haben
+  ihre Restevidenz in einem plausiblen Ordner (Placetel, WVIB, Microsoft,
+  Redmine …). **Kandidat fuer dasselbe, nicht entschieden:**
+  `Personal/Langen Emails` (350 Mails, letzte 2023; LinkedIn zeigt ohne
+  Riekehof dorthin).
 - **Kein Kalenderbezug fuer Reisen** (Helmut 2026-10-05: „zu gefaehrlich").
   Nicht erneut vorschlagen.
 - **„Sei immer so spezifisch wie du sein kannst"** (Helmut 2026-10-05, zu Reisen,
