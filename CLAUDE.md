@@ -469,8 +469,8 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   SCHOEPS` (Jahrgang nur ueber den Thread). **Scanner** (`1og-entwicklung@`,
   `1og-service_support_entwicklung@`, „Attached Image") geht seit 2026-10-05
   hart in den Redmine-Ordner, den Helmut dafuer in **„Redmine, Planio, Slite,
-  Scanner"** umbenannt hat. **Offen:** „Einlesen:" von `powerautomate@schoeps.de`
-  (25, Gegenstueck zu 640 eigenen in Gesendet) — Zielordner fehlt. „Per E-Mail
+  Scanner"** umbenannt hat. **`powerautomate@schoeps.de`** („Einlesen:", Gegenstueck
+  zu 640 eigenen in Gesendet) geht hart nach `❻ …/Microsoft`. „Per E-Mail
   senden:" ist KEINE Regel: alte Kollegen-Mails mit Anhang, thematisch verschieden.
 - **Feste Regeln zeigen ueber den PFAD auf ihren Ordner.** Benennt Helmut einen
   Ordner um, faellt die Regel sonst still aus (beinahe passiert bei der
@@ -780,7 +780,12 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   **Rest 3.738** sind Kollegen-Diskussionen (fleing, gundert, schaefer,
   einkauf …), die Thread und feste Regeln nicht erreichen — nur die KI oder
   Helmuts Hand (Nachzieher). Danach Scanner: 88 weitere (75 Scanner, 12
-  Thread, 1 Adresse), Rest **3.650**, Graph = Index. Offen: 25 „Einlesen:".
+  Thread, 1 Adresse), dann 25 Power-Automate nach `…/Microsoft`. Waehrenddessen
+  sortierte Helmut von Hand (248 Mails, 236 nach `❷ Einkauf, Fertigung`) —
+  Stand danach im Postfach **3.317**; der Index holt Handbewegungen erst beim
+  naechsten Voll-Sync nach (bis 16 min), eine Graph/Index-Differenz direkt nach
+  einem Lauf ist also kein Fehler, solange die fehlenden Mails ohne `auto-*` in
+  Zielordnern liegen.
 - **`Move/Unbestimmt`** als KI-Warteschlange nutzen, sobald Phase 3 laeuft.
 - **Lokale Geheimnis-Dateien** `C:\PROJEKTE\graph_secret.txt` und
   `C:\PROJEKTE\Slack token.txt` liegen noch — beide stehen in der VPS-.env;
