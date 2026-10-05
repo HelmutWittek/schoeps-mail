@@ -135,6 +135,8 @@ pruefe(regel.harte_ablage("email.claude.com", "Deprecation notice", None,
 pruefe(regel.harte_ablage("google.com", "Summary of failures", None,
                           "noreply-apps-scripts-notifications@google.com")["name"] == "ki_dienste",
        "Apps-Script-Fehler → AI")
+pruefe(regel.harte_ablage("schoeps.de", "Attached Image", None, "1OG-Entwicklung@schoeps.de")["name"] == "scanner",
+       "Scanner → Redmine, Planio, Slite, Scanner")
 pruefe(regel.harte_ablage("google.com", "Sicherheitswarnung", None, "no-reply@accounts.google.com") is None,
        "andere Google-Adresse trifft nicht")
 pruefe(regel.harte_ablage("sennheiser.com", None) is None, "Wettbewerber trifft nicht")

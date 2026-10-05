@@ -21,12 +21,16 @@ Das Gewicht kommt aus `mail_evidenz`: handsortiert 2, vom Automaten abgelegt
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+log = logging.getLogger("schoepsmail.regel")
+_FEHLENDE_ZIELE: set[str] = set()
 
 MIN_EVIDENZ = float(os.getenv("REGEL_MIN_EVIDENZ", "2"))
 MIN_ANTEIL = float(os.getenv("REGEL_MIN_ANTEIL", "0.8"))
@@ -250,12 +254,23 @@ HARTE_ABLAGE: list[dict[str, Any]] = [
     # Adressen, nicht die Domains: von plan.io und slite.com kommen auch
     # Rechnungen und Konto-Post (liegen in `Personal/Riekehof Emails`).
     # `hello@slite.com` und `PLAN.IO` fuellt zusaetzlich eine Outlook-Regel.
+    # Ordner heisst seit 2026-10-05 „Redmine, Planio, Slite, Scanner" (Helmut hat
+    # ihn umbenannt) — ein Pfad hier muss dem echten Ordnernamen folgen, sonst
+    # faellt die Regel aus (nach_harter_ablage warnt dann im Log).
     {
         "name": "redmine",
-        "pfad": os.getenv("REDMINE_PFAD", "Posteingang/Redmine, Planio, Slite"),
+        "pfad": os.getenv("REDMINE_PFAD", "Posteingang/Redmine, Planio, Slite, Scanner"),
         "domains": (),
         "marken": (),
         "adressen": ("redmine@schoeps.de", "no-reply@plan.io", "do-not-reply@slite.com"),
+    },
+    # Scanner im 1. OG (Helmut 2026-10-05): „Attached Image"-Mails.
+    {
+        "name": "scanner",
+        "pfad": os.getenv("REDMINE_PFAD", "Posteingang/Redmine, Planio, Slite, Scanner"),
+        "domains": (),
+        "marken": (),
+        "adressen": ("1og-entwicklung@schoeps.de", "1og-service_support_entwicklung@schoeps.de"),
     },
     # Mitteilungen der KI- und Automatisierungsdienste.
     {
@@ -333,11 +348,28 @@ async def nach_harter_ablage(s: AsyncSession, von_domain: str | None, betreff: s
                         {"p": treffer["pfad"]})
     row = r.fetchone()
     if not row:
+        # Einmal je Pfad melden: ein umbenannter Ordner liess die Regel sonst
+        # still ausfallen (2026-10-05, „Redmine, Planio, Slite" → „…, Scanner").
+        if treffer["pfad"] not in _FEHLENDE_ZIELE:
+            _FEHLENDE_ZIELE.add(treffer["pfad"])
+            log.warning("Feste Regel %r: Zielordner %r fehlt im Index — Regel greift nicht",
+                        treffer["name"], treffer["pfad"])
         return None
     return {"ordner_id": row[0], "ziel_pfad": treffer["pfad"], "treffer": 1.0, "gesamt": 1.0,
             "anteil": 1.0, "kandidaten": [], "stufe": "auffang" if auffang else "hart",
             "schluessel": treffer["name"],
             "begruendung": f"{treffer['grund']} — feste Ablage {treffer['name']}"}
+
+
+async def fehlende_ziele(s: AsyncSession) -> list[str]:
+    """Zielordner fester Regeln, die es im Index nicht (mehr) gibt — etwa nach
+    einer Umbenennung im Postfach. Der Worker prueft das nach jedem Voll-Sync."""
+    pfade = sorted({r["pfad"] for r in HARTE_ABLAGE + AUFFANG_ABLAGE})
+    r = await s.execute(text("""
+        SELECT pfad FROM ordner WHERE pfad = ANY(:p) AND verschwunden_am IS NULL
+    """), {"p": pfade})
+    da = {row[0] for row in r.fetchall()}
+    return [p for p in pfade if p not in da]
 
 
 JUENGSTE_HAND_N = int(os.getenv("REGEL_JUENGSTE_HAND_N", "3"))

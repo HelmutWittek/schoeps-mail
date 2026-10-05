@@ -22,7 +22,8 @@ import logging
 import os
 from datetime import date
 
-from src import index, llm, nachzieher, outlook_regeln, profil, slack, sortierer
+from src import index, llm, nachzieher, outlook_regeln, profil, regel, slack, sortierer
+from src.db import get_session
 from src.graph import Graph
 from src.heartbeat import record_failure, record_success
 
@@ -57,6 +58,14 @@ def _secret_pruefen() -> str | None:
 async def voll_sync(graph: Graph) -> int:
     ordner = await index.spiegle_ordner(graph)
     neu, weg = await index.sync_mails(graph, ordner)
+    # Feste Regeln zeigen ueber den Pfad auf ihren Ordner. Wird ein Ordner im
+    # Postfach umbenannt, faellt die Regel sonst still aus (2026-10-05).
+    async with get_session() as s:
+        fehlend = await regel.fehlende_ziele(s)
+    if fehlend:
+        meldung = f"Feste Regeln ohne Zielordner (umbenannt?): {', '.join(fehlend)}"
+        log.warning(meldung)
+        await slack.alarm("regel-ziel", meldung)
     if llm.aktiv():
         try:
             await profil.profil_lauf()
