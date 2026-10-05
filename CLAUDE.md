@@ -450,6 +450,22 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   Outlook-Regeln rutschen. Erster Lauf: 10 Einladungen aus `Move` bewegt
   (Jour fixe, KI-Vortreffen, Mitarbeitergespraech, Jubilaeum, RoHS). **Nicht
   erfasst:** die Bookings-Mails „Neue Buchung: …" — das sind gewoehnliche Mails.
+- **Grundprinzip Outlook-Regel vs. Worker (Helmut 2026-10-05):** „Outlook-Regeln
+  immer da, wo ich die Mail nicht sehen will/muss. Autosortierung dort, wo ich die
+  Mail zumindest einmal kurz sehen will/muss." Also: Systemmails, Newsletter,
+  Listen, Benachrichtigungen → Outlook-Regel bei der Zustellung. Menschen und
+  Geschaeftspartner → keine Regel, Helmut sieht sie im Posteingang, zieht sie nach
+  `Move`, der Worker sortiert (feste Regel in `HARTE_ABLAGE` oder Statistik).
+  **Regelhygiene danach (2026-10-05, je Gruppe Go von Helmut):** 113 → 57 Regeln.
+  Geloescht: 37 ohne je eine passende Mail (Presse-Karteileichen, Mailchimp-
+  Wechseladressen, AES-Newsletter), Plugin Alliance, 3x Microsoft, Google
+  Payments, die doppelte `applusgo`-Regel (Ziel `…/ERP`), 7 Personen-/
+  Partnerregeln (Seeger, Henninger, Hildebrand, Rycote, pnp-verlag, Frommer,
+  Personio), 2 ausgeschaltete `imm.alumni`, „Zugesagt" (doppelt zu
+  `isMeetingResponse`), Telekom (tot seit 2016), EasyChair, DATEV (war aus).
+  AES Membership bleibt. **Sicherung** aller 56 geloeschten Regeln als Graph-JSON
+  in `/root/outlook_regeln_geloescht_20261005.json` und `…_b.json` (chmod 600) —
+  wiederherstellbar per POST auf `mailFolders/inbox/messageRules`.
 - **„Je mehr stumpfe Regeln, desto besser"** (Helmut 2026-10-05). Feste
   Zuordnungen — Outlook-Regel bei der Zustellung, `HARTE_ABLAGE` im Worker —
   gehen vor Statistik und KI. Wo ein Merkmal eindeutig ist, zuerst eine Regel
@@ -773,11 +789,9 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   auch der Vorfall beim Einschalten). Was die KI als `sicher` sieht, steht mit
   `dry_run = true` in `regel_entscheidung` — Grundlage fuer die naechste Messung
   am echten Zufluss statt an der Historie.
-- **Regelhygiene im Postfach** (Befund oben, Aufraeumen ist Helmuts Entscheidung):
-  2 Widersprueche (Regel legt in den Elternordner, er selbst in den Unterordner),
-  1 doppelt belegte Adresse, 2 leere und 29 als fehlerhaft gemeldete Regeln
-  (alle aus), 69 eingeschlafene. Der Bericht laeuft auf Zuruf, es meldet nichts
-  von selbst — ein Slack-Push waere Phase 4.
+- **Regelhygiene erledigt (2026-10-05):** 57 Regeln, alle aktiv, alle nach dem
+  Grundprinzip (siehe Entscheidungen). Bericht weiter auf Zuruf
+  (`scripts/regel_bericht.py`).
 - **Phase 4:** Ordnervorschlaege A–C, Slack-Push mit Link, Bestaetigungsseite
   hinter Caddy (Basic Auth), Profile editierbar, Nachzieher-Vorschlaege fuer
   Geschwister in anderen Themenordnern.
