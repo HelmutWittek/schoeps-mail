@@ -51,6 +51,19 @@ ARBEITS_PFADE = {
     "Synchronisierungsprobleme", "Verlauf der Unterhaltung",
 }
 
+# Altablagen: Ordner, die nie Ziel und nie Evidenz sein duerfen, aber anders als
+# Sammelordner auch nicht aufgeloest werden (keine Quelle des Nachziehers).
+# `Riekehof Emails` (Helmut 2026-10-05: „darf nie Zielordner sein, ist legacy").
+# Gegenprobe vor dem Umstellen: die Absender darin (Newsletter, Slite, LinkedIn,
+# Placetel, WVIB …) haben ihre Restevidenz ueberall in einem plausiblen Ordner,
+# keiner kippt in einen falschen.
+ALTABLAGE_PFADE = {
+    p.strip() for p in os.getenv(
+        "ALTABLAGE_PFADE", "❻ Verwaltung/Personal/Riekehof Emails"
+    ).split("|") if p.strip()
+}
+ARBEITS_PFADE |= ALTABLAGE_PFADE
+
 # Sammelordner, die der Nutzer aufloesen will (Entscheidung 2026-09-14):
 # `Posteingang/SCHOEPS intern` ist kein Ziel mehr und zaehlt nicht als Evidenz.
 # Kollegen-Post soll nach Thread und Thema in die Themenordner. Im Trockenlauf
