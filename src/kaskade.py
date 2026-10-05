@@ -91,6 +91,14 @@ async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None 
     if t:
         return {**t, "sicherheit": "sicher", "kandidaten": []}
 
+    # Auffang nach Stufe 2: feste Regeln „wenn nicht spezifisch moeglich"
+    # (Abwesenheitsnotizen, MikroForum) — der Thread hatte Vorrang.
+    t = await regel.nach_harter_ablage(s, mail.get("von_domain"), mail.get("betreff"),
+                                       mail.get("nachrichtentyp"), mail.get("von_adresse"),
+                                       auffang=True)
+    if t:
+        return {**t, "sicherheit": "sicher"}
+
     # Stufe 3 — nur Kandidaten
     for k in await konversation.absender_bezug(s, mail.get("von_adresse"), ohne_mail_id):
         if all(k["ordner_id"] != x["ordner_id"] for x in kandidaten):
@@ -130,7 +138,7 @@ def bewegt(e: dict[str, Any]) -> bool:
     """Darf dieses Ergebnis eine Mail verschieben?"""
     if not e.get("ordner_id"):
         return False
-    if e["stufe"] in ("hart", "uninteressant", "adresse", "domain", "thread"):
+    if e["stufe"] in ("hart", "auffang", "uninteressant", "adresse", "domain", "thread"):
         return True
     return e["stufe"] == "ki" and e.get("sicherheit") == KI_BEWEGT_AB and KI_SICHER_BEWEGT
 
@@ -138,7 +146,7 @@ def bewegt(e: dict[str, Any]) -> bool:
 def kategorie(e: dict[str, Any]) -> str:
     if nach_unbestimmt(e):
         return KATEGORIE_UNBESTIMMT
-    return {"hart": "auto-regel", "adresse": "auto-regel", "domain": "auto-regel",
+    return {"hart": "auto-regel", "auffang": "auto-regel", "adresse": "auto-regel", "domain": "auto-regel",
             "thread": "auto-thread", "ki": "auto-ki",
             "uninteressant": KATEGORIE_UNINTERESSANT}[e["stufe"]]
 

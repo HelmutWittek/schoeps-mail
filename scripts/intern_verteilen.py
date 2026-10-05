@@ -105,7 +105,7 @@ async def main(pfad: str, limit: int | None, monate: int | None, mit_ki: bool,
     print("\nErgebnis je Stufe:")
     for k, v in sorted(zaehler.items(), key=lambda kv: -kv[1]):
         print(f"  {k:<14}{v:>6}")
-    waere = sum(v for k, v in zaehler.items() if k in ("hart", "adresse", "domain", "thread", "ki/sicher"))
+    waere = sum(v for k, v in zaehler.items() if k in ("hart", "auffang", "adresse", "domain", "thread", "ki/sicher"))
     print(f"\n{'Bewegt' if ausfuehren else 'Wuerde bewegen'}: {waere} von {len(mails)} "
           f"({100 * waere / max(len(mails), 1):.0f} %)")
     if mit_ki:

@@ -268,16 +268,38 @@ HARTE_ABLAGE: list[dict[str, Any]] = [
     },
 ]
 
+# Auffang-Regeln: wie die harte Ablage, aber erst NACH Stufe 1 und 2 — „wenn
+# nicht spezifisch moeglich" (Helmut 2026-10-05). Liegt der Thread schon in
+# einem bestimmten Ordner (etwa einem MikroForum-Jahrgang), gewinnt der; sonst
+# greift der feste Auffang-Ordner.
+AUFFANG_ABLAGE: list[dict[str, Any]] = [
+    {
+        "name": "auto_antwort",
+        "pfad": os.getenv("EINLADUNG_PFAD", "Posteingang/Einladungen"),
+        "domains": (),
+        "marken": (),
+        "betreff_anfaenge": ("automatische antwort:", "automatic reply:", "autoreply:"),
+    },
+    {
+        "name": "mikroforum",
+        "pfad": os.getenv("MIKROFORUM_PFAD", "❺ Ausstellung/Mikroforum SCHOEPS"),
+        "domains": (),
+        "marken": (),
+        "adressen": ("mikroforum@schoeps.de",),
+    },
+]
+
 
 def harte_ablage(von_domain: str | None, betreff: str | None,
                  nachrichtentyp: str | None = None,
-                 von_adresse: str | None = None) -> dict[str, Any] | None:
-    """Greift eine harte Ablage-Regel? Reine Logik, liefert die Regel oder None."""
+                 von_adresse: str | None = None,
+                 liste: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
+    """Greift eine feste Regel (Default: HARTE_ABLAGE)? Reine Logik, liefert sie oder None."""
     kand = domain_kandidaten(von_domain or "")
     tag = betreff_tag(betreff)
     adresse = (von_adresse or "").strip().lower()
     betreff_klein = (betreff or "").strip().lower()
-    for regel in HARTE_ABLAGE:
+    for regel in (HARTE_ABLAGE if liste is None else liste):
         praefix = regel.get("typ_praefix")
         if praefix and nachrichtentyp and nachrichtentyp.startswith(praefix):
             return {**regel, "grund": f"Nachrichtentyp {nachrichtentyp}"}
@@ -295,13 +317,16 @@ def harte_ablage(von_domain: str | None, betreff: str | None,
 
 async def nach_harter_ablage(s: AsyncSession, von_domain: str | None, betreff: str | None,
                              nachrichtentyp: str | None = None,
-                             von_adresse: str | None = None) -> dict[str, Any] | None:
-    """Stufe 0: Ticket-System erkannt -> fester Zielordner, ohne Statistik.
+                             von_adresse: str | None = None,
+                             auffang: bool = False) -> dict[str, Any] | None:
+    """Stufe 0 (oder mit `auffang` die Auffang-Regeln nach Stufe 2): feste Regel
+    erkannt -> fester Zielordner, ohne Statistik.
 
     Fehlt der Zielordner im Index, greift die Regel nicht und die Kaskade
     laeuft normal weiter — nie raten, nie einen Ordner erfinden.
     """
-    treffer = harte_ablage(von_domain, betreff, nachrichtentyp, von_adresse)
+    treffer = harte_ablage(von_domain, betreff, nachrichtentyp, von_adresse,
+                           AUFFANG_ABLAGE if auffang else None)
     if not treffer:
         return None
     r = await s.execute(text("SELECT id FROM ordner WHERE pfad = :p AND verschwunden_am IS NULL"),
@@ -310,7 +335,8 @@ async def nach_harter_ablage(s: AsyncSession, von_domain: str | None, betreff: s
     if not row:
         return None
     return {"ordner_id": row[0], "ziel_pfad": treffer["pfad"], "treffer": 1.0, "gesamt": 1.0,
-            "anteil": 1.0, "kandidaten": [], "stufe": "hart", "schluessel": treffer["name"],
+            "anteil": 1.0, "kandidaten": [], "stufe": "auffang" if auffang else "hart",
+            "schluessel": treffer["name"],
             "begruendung": f"{treffer['grund']} — feste Ablage {treffer['name']}"}
 
 

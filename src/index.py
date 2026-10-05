@@ -53,13 +53,14 @@ ARBEITS_PFADE = {
 
 # Altablagen: Ordner, die nie Ziel und nie Evidenz sein duerfen, aber anders als
 # Sammelordner auch nicht aufgeloest werden (keine Quelle des Nachziehers).
-# `Riekehof Emails` (Helmut 2026-10-05: „darf nie Zielordner sein, ist legacy").
+# `Riekehof Emails` und `Langen Emails` (Helmut 2026-10-05: „darf nie
+# Zielordner sein, ist legacy").
 # Gegenprobe vor dem Umstellen: die Absender darin (Newsletter, Slite, LinkedIn,
 # Placetel, WVIB …) haben ihre Restevidenz ueberall in einem plausiblen Ordner,
 # keiner kippt in einen falschen.
 ALTABLAGE_PFADE = {
     p.strip() for p in os.getenv(
-        "ALTABLAGE_PFADE", "❻ Verwaltung/Personal/Riekehof Emails"
+        "ALTABLAGE_PFADE", "❻ Verwaltung/Personal/Riekehof Emails|❻ Verwaltung/Personal/Langen Emails"
     ).split("|") if p.strip()
 }
 ARBEITS_PFADE |= ALTABLAGE_PFADE

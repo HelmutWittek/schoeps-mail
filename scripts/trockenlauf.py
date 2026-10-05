@@ -108,14 +108,15 @@ async def main(n: int, monate: int, mit_ki: bool, seed: float, zeige: int, nur_k
 
     print(f"\n{'Stufe':<14}{'entsch.':>8}{'richtig':>8}{'falsch':>7}{'offen':>7}{'Quote':>8}")
     gesamt_richtig = gesamt_entsch = 0
-    for schl in ["adresse", "domain", "thread", "ki/sicher", "ki/unsicher", "ki/nirgends", "unklar"]:
+    for schl in ["hart", "adresse", "domain", "thread", "auffang", "ki/sicher", "ki/unsicher",
+                 "ki/nirgends", "unklar"]:
         c = je_stufe.get(schl)
         if not c:
             continue
         entsch = c["richtig"] + c["falsch"]
         quote = f"{100 * c['richtig'] / entsch:5.1f} %" if entsch else "   —"
         print(f"{schl:<14}{entsch:>8}{c['richtig']:>8}{c['falsch']:>7}{c['offen']:>7}{quote:>8}")
-        if schl in ("adresse", "domain", "thread", "ki/sicher"):
+        if schl in ("hart", "adresse", "domain", "thread", "auffang", "ki/sicher"):
             gesamt_richtig += c["richtig"]
             gesamt_entsch += entsch
     bewegt = gesamt_entsch

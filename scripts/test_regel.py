@@ -108,6 +108,19 @@ pruefe(regel.harte_ablage("schoeps.de", "Stornierte Buchung: X", None)["name"] =
 pruefe(regel.harte_ablage("schoeps.de", "AW: Buchung Saal", None) is None,
        "Betreff-Anfang greift nur am Anfang")
 
+# Auffang-Regeln (nach Stufe 2, „wenn nicht spezifisch moeglich")
+A = regel.AUFFANG_ABLAGE
+pruefe(regel.harte_ablage("schoeps.de", "Automatische Antwort: Messe", None, None, A)["name"] == "auto_antwort",
+       "Abwesenheitsnotiz faengt der Auffang")
+pruefe(regel.harte_ablage("schoeps.de", "Automatische Antwort: Messe", None, None) is None,
+       "Abwesenheitsnotiz ist KEINE harte Stufe 0 (der Thread hat Vorrang)")
+pruefe(regel.harte_ablage("schoeps.de", "Programm", None, "MikroForum@schoeps.de", A)["name"] == "mikroforum",
+       "MikroForum-Adresse faengt der Auffang")
+pruefe(regel.harte_ablage("schoeps.de", "Programm", None, "wittek@schoeps.de", A) is None,
+       "andere Kollegen faengt der Auffang nicht")
+pruefe(kaskade.bewegt({"stufe": "auffang", "ordner_id": "x"}) and
+       kaskade.kategorie({"stufe": "auffang"}) == "auto-regel", "Auffang bewegt mit auto-regel")
+
 # Feste Regeln aus der Move-Durchsicht (2026-10-05)
 pruefe(regel.harte_ablage("plan.io", "[Elektret ZIM-Projekt - Aufgabe #14]", None,
                           "no-reply@plan.io")["name"] == "redmine", "Planio-Benachrichtigung → Redmine")
