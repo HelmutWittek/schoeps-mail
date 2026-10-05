@@ -464,7 +464,7 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   deren Ordner, sonst `Reisen, Bahn`; Unterordner vor Elternordner. Umgesetzt
   als `urteil.REGEL_SPEZIFISCH` (ersetzt „Eltern und Kind nahe → unsicher").
   **A/B an drei Stichproben, gleicher Lauf:** 62,9 / 58,7 / 63,8 % mit, 63,2 /
-  61,2 % ohne Regel — kein messbarer Unterschied. Die Bahn-Buchungen landen
+  61,2 / 59,2 % ohne Regel — kein messbarer Unterschied. Die Bahn-Buchungen landen
   weiter in `Reisen, Bahn`: aus Buchungsnummer, Datum und Strecke allein kann
   die KI keinen Messe- oder Termin-Ordner ableiten. Ein echter Hebel waere der
   Kalender (`Calendars.Read` ist da): Reisedatum → Termin an dem Tag → Ordner
