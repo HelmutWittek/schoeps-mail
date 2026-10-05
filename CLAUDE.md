@@ -419,6 +419,11 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   `Abgesagt:`/`Canceled:` → `Posteingang/Einladungen` (60 in 12 Monaten, auch die
   3 Absagen externer Termine im Bundestag-Ordner wuerden kuenftig dort landen).
   Neue Einladungen bekommen bewusst keine Regel — die muss Helmut beantworten.
+  Bestand am selben Tag nachgezogen (Go von Helmut): 471 Antraege aus
+  `SCHOEPS intern` + 4 aus `Move` nach `Abwesenheiten`, 7 Absagen aus `Move`
+  nach `Einladungen`, 0 Fehler, per Graph gegengezaehlt (475 im Ordner).
+  Protokolliert als Stufe `hart` mit Kategorie `auto-regel`, Begruendung nennt
+  die Regel.
 - **Der Worker legt fehlende Kategorien selbst an.**
 - **Newsletter werden normal einsortiert** (alle Stufen), erzeugen aber nie
   Ordnervorschlaege und zaehlen nicht in die thematische Verdichtung.
