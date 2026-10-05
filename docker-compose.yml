@@ -28,6 +28,10 @@ services:
       NACHZIEHER_DRY_RUN: ${NACHZIEHER_DRY_RUN:-1}
       POSTEINGANG_DRY_RUN: ${POSTEINGANG_DRY_RUN:-1}
       SORTIERER_KI: ${SORTIERER_KI:-0}
+      # Halbscharf (2026-10-05): KI raeumt nur weg, `sicher` wird nur protokolliert.
+      # Fehlte hier beim ersten Scharfschalten — der Code-Default bewegte dann 9 Mails.
+      KI_SICHER_BEWEGT: ${KI_SICHER_BEWEGT:-0}
+      KI_PAUSE_H: ${KI_PAUSE_H:-24}
       POLL_SECONDS: ${POLL_SECONDS:-120}
       VOLL_SYNC_ALLE: ${VOLL_SYNC_ALLE:-8}
       TZ: Europe/Berlin

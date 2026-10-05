@@ -29,7 +29,8 @@ KI_BEWEGT_AB = "sicher"
 # die KI nur weg (`nirgends` → `Move/Unbestimmt`), ein `sicher` mit Zielordner
 # wird nur protokolliert. Grund: `nirgends` hat im Gegentest keine echte
 # Geschaeftspost verworfen, die Ordnerwahl bei `sicher` liegt dagegen unter 90 %.
-KI_SICHER_BEWEGT = os.getenv("KI_SICHER_BEWEGT", "1") != "0"
+# Default 0: voll scharf nur mit ausdruecklichem KI_SICHER_BEWEGT=1.
+KI_SICHER_BEWEGT = os.getenv("KI_SICHER_BEWEGT", "0") == "1"
 
 # Marke fuer alles, was der Sortierer nach `Move/Unbestimmt` wegraeumt.
 KATEGORIE_UNBESTIMMT = "auto-unbestimmt"

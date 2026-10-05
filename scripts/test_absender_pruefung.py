@@ -88,8 +88,11 @@ pruefe(kaskade.kategorie({"stufe": "ki", "sicherheit": "sicher"}) == "auto-ki",
        "ein sicheres KI-Urteil behaelt auto-ki")
 
 # Halbscharfer Betrieb (2026-10-05): KI raeumt nur weg, `sicher` wird nur protokolliert
+pruefe(not kaskade.bewegt({"stufe": "ki", "sicherheit": "sicher", "ordner_id": "x"}),
+       "per Default bewegt ein sicheres KI-Urteil NICHT (halbscharf)")
+kaskade.KI_SICHER_BEWEGT = True
 pruefe(kaskade.bewegt({"stufe": "ki", "sicherheit": "sicher", "ordner_id": "x"}),
-       "per Default bewegt ein sicheres KI-Urteil")
+       "mit KI_SICHER_BEWEGT=1 bewegt `sicher`")
 kaskade.KI_SICHER_BEWEGT = False
 pruefe(not kaskade.bewegt({"stufe": "ki", "sicherheit": "sicher", "ordner_id": "x"}),
        "mit KI_SICHER_BEWEGT=0 bewegt `sicher` nicht")
@@ -100,7 +103,7 @@ pruefe(kaskade.bewegt({"stufe": "thread", "ordner_id": "x"}),
 pruefe(not kaskade.nach_unbestimmt({"stufe": "ki", "sicherheit": "nirgends",
                                     "bekannt": "Domain illusonic.com hat 120 abgelegte Mails"}),
        "`nirgends` bei einem Bekannten bleibt in Move (Illusonic-Einladung, 2026-10-05)")
-kaskade.KI_SICHER_BEWEGT = True
+kaskade.KI_SICHER_BEWEGT = False  # Default wiederherstellen
 
 # Grobe Vorstufe im Posteingang (uninteressant.py, 2026-09-17)
 pruefe(kaskade.bewegt({"stufe": "uninteressant", "ordner_id": "x"}),
