@@ -842,9 +842,8 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   mit Textlaenge/-anfang geloggt); Haiku erfindet gelegentlich Pfade (wird als
   unsicher verworfen — oder, wenn nur die Bereichsmarke fehlt, ueber
   `urteil.normpfad()` doch zugeordnet). Automatische Tests sind
-  `test_regel.py` (46) und `test_absender_pruefung.py` (57), beide ohne DB;
-  **DB-Tests fuer Bewegungslog, Nachzieher und die harte Ablage fehlen**
-  (bisher nur Live-Tests und Messlaeufe gegen den Bestand).
+  `test_regel.py` (63), `test_absender_pruefung.py` (57) und `test_db.py` (21,
+  DB in zurueckgerollter Transaktion, seit 2026-10-05).
 
 ## Phasen
 
@@ -855,10 +854,17 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
 | 2 | Stufen 1–3 scharf, Kategorien, Schalter `DRY_RUN`; **dazu Bewegungslog, Juengste-Hand-Regel, Nachzieher** (Helmuts Wunsch vom 15.09.: Handablage soll auch rueckwaerts wirken) | **scharf seit 2026-09-15** (Sortierer 09:59, Nachzieher 14:43); Live-Tests 22 bzw. 6 Mails, alle Entscheidungen von Helmut bestaetigt |
 | 3 | Stufe 4 (KI) scharf, `Unbestimmt` als KI-Warteschlange, Protokoll mit Begruendungen | **halbscharf seit 2026-10-05** (nur Wegraeumen); Einsortieren offen — `sicher` 57–73 %, Profile vorher schaerfen |
 | 4 | Vorschlaege A–C, Slack-Push, Bestaetigungsseite, Profile editierbar, Nachzieher-Vorschlaege fuer andere Themenordner | offen |
-| 5 | Alarme vervollstaendigen, Doku, DB-Tests | teils (Heartbeat + Slack-Alarm laufen) |
+| 5 | Alarme vervollstaendigen, Doku, DB-Tests | teils: Heartbeat, Slack-Alarm, Pfad-Waechter (Regelziele, Sonderpfade), DB-Tests seit 2026-10-05 |
 
-Tests: `scripts/test_regel.py` (46) und `scripts/test_absender_pruefung.py` (57),
-beide ohne DB, im Container laufen lassen.
+Tests: `scripts/test_regel.py` (63) und `scripts/test_absender_pruefung.py` (57)
+ohne DB, dazu **`scripts/test_db.py` (21, seit 2026-10-05)** gegen die echte DB:
+alles in EINER Transaktion, die zurueckgerollt wird (`get_session()` auf eine
+Verbindung mit Savepoints umgebogen), Graph als Attrappe — der laufende Worker
+sieht keine Testzeile, eine zweite Verbindung prueft am Ende, dass nichts
+uebrig ist. Deckt Pfad-Waechter, Bewegungslog, harte Ablage/Auffang gegen die
+echten Zielordner, Thread, Nachzieher und OOF-Nachtrag ab. Gegenprobe mit
+falschem `SAMMELORDNER_PFADE` schlaegt an. Alle drei im Container laufen
+lassen, nach jeder Aenderung an Regeln oder Ordnerpfaden.
 Regel fuer kuenftige DB-Tests: nur eigene Testdaten (`ZZTEST…`), Aufraeumer loeschen
 nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenzt.
 
