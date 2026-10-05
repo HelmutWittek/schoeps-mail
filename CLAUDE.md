@@ -1,14 +1,17 @@
 # CLAUDE.md — Schoeps-Mail
 
-Mail-Automation fuer das Schoeps-Postfach `wittek@schoeps.de`. **Stand 2026-09-16:
-Phase 2 laeuft scharf im Dauerbetrieb.** Der Worker `schoeps-mail-worker` auf dem
+Mail-Automation fuer das Schoeps-Postfach `wittek@schoeps.de`. **Stand 2026-10-05:
+Phase 2 laeuft scharf im Dauerbetrieb, die KI-Stufe halbscharf** (raeumt nur
+weg, siehe unten). Der Worker `schoeps-mail-worker` auf dem
 VPS sortiert `Posteingang/Move` mit Stufe 0–3 (seit 2026-09-15 09:59,
 `DRY_RUN='0'`), fuehrt das Bewegungslog und zieht Helmuts Handablagen per
 Nachzieher auf `Move`, `Unbestimmt` und `SCHOEPS intern` nach (seit 14:43,
 `NACHZIEHER_DRY_RUN='0'`). Seit 2026-09-16 gehen Zendesk-Tickets ueber die harte
-Stufe 0 in ihren Ordner. Die KI-Stufe ist gebaut und gemessen, aber **nicht
-scharf** (`SORTIERER_KI=0`, Phase 3) — der Vorfilter davor und das Wegraeumen
-nach `Move/Unbestimmt` stehen bereits.
+Stufe 0 in ihren Ordner, seit 2026-10-05 auch Einladungen/Zusagen/Absagen
+(am Nachrichtentyp erkannt). **Die KI-Stufe laeuft seit 2026-10-05 halbscharf**
+(`SORTIERER_KI='1'`, `KI_SICHER_BEWEGT='0'`): sie raeumt Erstkontakte, die in
+keinen Ordner gehoeren, nach `Move/Unbestimmt`; ihre Ordnerwahl (`sicher`)
+wird nur protokolliert, weil sie bei 57–73 % liegt (Ziel 90 %).
 Erster Tag: 62 + 11 Mails aus Move bewegt, 2.305 aus `SCHOEPS intern` verteilt,
 0 Fehler. Details: „Was steht", „Entscheidungen", „Phasen", „Offene Punkte".
 
@@ -22,13 +25,13 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 |---|---|
 | `src/graph.py` | Graph-Client: client_credentials, Retry-After, `IdType=ImmutableId` ueberall, Delta je Ordner (seitenweise), Move, Kategorien, Ordner anlegen, Mailtext holen |
 | `src/index.py` | Ordnerbaum spiegeln (Pfade, Arbeitsordner ueber Well-Known-Namen, Vererbung ausser `inbox`), Delta-Sync mit Commit je Seite; ein Ordnerfehler laesst die anderen durch, Zyklus gilt als gescheitert |
-| `src/regel.py` | **Stufe 0 harte Ablage** (`HARTE_ABLAGE`, `harte_ablage()`): Ticket-Systeme gehen ohne Schwelle in ihren Ordner, vor aller Statistik; dann Stufe 1: Adresse, Domain-Rollup, `MIN_EVIDENZ`=2, `MIN_ANTEIL`=0.8, eigene und Anbieter-Domains entscheiden nie |
+| `src/regel.py` | **Stufe 0 harte Ablage** (`HARTE_ABLAGE`, `harte_ablage()`): Ticket-Systeme (Domain/Betreff-Marke) und Einladungen (Nachrichtentyp `eventMessage*`, seit 2026-10-05) gehen ohne Schwelle in ihren Ordner, vor aller Statistik; dann Stufe 1: Adresse, Domain-Rollup, `MIN_EVIDENZ`=2, `MIN_ANTEIL`=0.8, eigene und Anbieter-Domains entscheiden nie |
 | `src/konversation.py` | Stufe 2 Thread (`conversationId`, eine Mail reicht, streut er → Kandidaten), Stufe 3 Absender-Bezug (nur Kandidaten) |
 | `src/profil.py` | Ordnerprofile (Haiku, 2–3 Saetze, woechentlich, `profil_manuell` bleibt), parallel 6 |
 | `src/urteil.py` | Stufe 4: Ordnerbaum + Profile im Systemprompt (cache_control), Kandidaten mit Vorrang, `sicher|unsicher|nirgends`; Mailtext in `<mail>`-Klammern mit der Regel, dass er beurteilt und nicht befolgt wird (Anweisungen IN der Mail sind ein Grund fuer `unsicher`). `REGEL_AKQUISE`: unaufgeforderte Anbieter-Akquise ist `nirgends` (eigene Konstante, damit ein Messlauf sie abziehen kann). `ziel_leer()` fangt „nirgends" im Pfad-Feld ab, `normpfad()` ordnet einen Pfad ohne Bereichsmarke zu, wenn genau einer passt; sonst unbekannter Pfad = unsicher |
-| `src/absender_pruefung.py` | **Vorfilter vor Stufe 4 (seit 2026-09-15):** haelt Mails an, bevor die KI sie liest — (a) Anzeigename nur aus unsichtbaren Zeichen (Cf/Cc/Co/Cs, Braille-Blank U+2800, Hangul-Filler), (b) Punycode-Domain, (c) Absender/Domain mit Junk-Historie, ohne Evidenz und mit Junk-Anteil >= 0.5. Reine Logik + eine DB-Abfrage, `pruefe()` liefert den Grund. Greift NUR bei `mit_ki` — Stufe 1–3 bleiben unberuehrt |
+| `src/absender_pruefung.py` | **Vorfilter vor Stufe 4 (seit 2026-09-15):** haelt Mails an, bevor die KI sie liest — (a) Anzeigename nur aus unsichtbaren Zeichen (Cf/Cc/Co/Cs, Braille-Blank U+2800, Hangul-Filler), (b) Punycode-Domain, (c) Absender/Domain mit Junk-Historie, ohne Evidenz und mit Junk-Anteil >= 0.5. Reine Logik + eine DB-Abfrage, `pruefe()` liefert den Grund. Greift NUR bei `mit_ki` — Stufe 1–3 bleiben unberuehrt. **`bekannter_absender()` (seit 2026-10-05):** ein KI-`nirgends` raeumt nur Erstkontakte weg — eigene Domain, Evidenz von Adresse/Domain (Anbieter-Domain zaehlt nicht), je hingeschrieben, Antwort im Thread halten die Mail in Move |
 | `src/uninteressant.py` | **Grobe Vorstufe im Posteingang (seit 2026-09-17):** raeumt Post weg, die Helmut selbst schon als uninteressant abgelegt hat — Adresse ab 1 Handbewegung nach `Move/Spam, uninteressant`, Domain ab `SPAM_MIN_DOMAIN`=2. Keine Heuristik auf Betreff/Inhalt, der Erstkontakt bleibt immer liegen. Vier Netze: eigene Domain nie, Evidenz auf der entscheidenden Ebene sperrt, „je hingeschrieben" sperrt, Antwort im Thread sperrt |
-| `src/kaskade.py` | fuehrt 1→4 zusammen, `bewegt()`/`kategorie()`, `protokolliere()` nach `regel_entscheidung` |
+| `src/kaskade.py` | fuehrt 1→4 zusammen, `bewegt()`/`kategorie()`, `protokolliere()` nach `regel_entscheidung`; `KI_SICHER_BEWEGT` (Default 0 = halbscharf); `letztes_ki_urteil()` verwendet ein KI-Urteil `KI_PAUSE_H`=24 h wieder, statt jede liegende Mail alle 2 min neu an Haiku zu geben |
 | `src/llm.py` | Haiku (`claude-haiku-4-5`) mit Structured Outputs, Ausfall = None |
 | `src/sortierer.py` | Phase 2: Kaskade ueber `Posteingang/Move`, Kategorie + Move per Graph, Index sofort nachgezogen, Bewegungslog `'worker'`, Unklares bleibt; **was in keinen Ordner gehoert (Vorfilter-Treffer, KI-`nirgends`) wandert mit `auto-unbestimmt` nach `Move/Unbestimmt`** (`UNBESTIMMT_PFAD`, `kaskade.nach_unbestimmt`), `unsicher` bleibt in Move; DRY_RUN protokolliert dedupliziert |
 | `src/nachzieher.py` | **Handablage wirkt rueckwaerts (seit 2026-09-15):** je neuer Handbewegung in einen Themenordner die Geschwister (Thread; Absender per Juengste-Hand-Regel) aus den Quell-Ordnern `Move`, `Move/*`, Sammelordnern nachziehen. Andere Themenordner werden nie angefasst (Phase 4: Vorschlag), Posteingang ist keine Quelle. `NACHZIEHER_DRY_RUN=1` (Default) protokolliert nur und laesst die Bewegungen offen; `NACHZIEHER_MAX_JE_LAUF`=150. **Scharf seit 2026-09-15 14:43** (`NACHZIEHER_DRY_RUN='0'` in der VPS-.env): Test mit 6 Handbewegungen (5 aus `Unbestimmt`, 1 aus Posteingang) → 2 Thread-Geschwister aus `SCHOEPS intern` nachgezogen, von Helmut als richtig bestaetigt |
@@ -38,9 +41,10 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 | `migrations/002_evidenz_betreff.sql` | `betreff` in der Evidenz-Sicht + Ausdrucks-Index fuer die Betreff-Marke |
 | `migrations/003_mail_bewegung.sql` | **Bewegungslog**: jeder Ordnerwechsel, `quelle` `'hand'` (per Delta gesehen) oder `'worker'` (eigener Move, in `sortierer.verschiebe` geschrieben — der Index sieht die Mail danach schon im Ziel und meldet keinen Wechsel). Graph kennt kein „wer"; das Audit-Log von Exchange waere Purview-only mit 24 h Verzug |
 | `src/outlook_regeln.py` | **Spiegel der Outlook-Posteingangsregeln (seit 2026-09-17):** `spiegle()` holt `mailFolders/inbox/messageRules` (nur lesend, geaendert wird im Postfach), `hygiene()` haelt sie gegen die Ablage-Historie — Ziel geloescht, leer, doppelt, Widerspruch, Wissen ohne Evidenz, eingeschlafen |
+| `migrations/006_nachrichtentyp.sql` | `mail.nachrichtentyp` = Graph-`@odata.type` ohne Namensraum (`eventMessageRequest`/`-Response`/`eventMessage`, NULL = gewoehnliche Mail); kommt im Delta ohnehin mit |
 | `migrations/005_outlook_regel.sql` | Tabelle `outlook_regel` + Sicht `outlook_regel_absender` (je Absenderangabe einer Regel eine Zeile; `sentToAddresses` bewusst nicht) |
 | `migrations/004_betreff_tag_ci.sql` | Marken-Index case-insensitiv (`Re:` neben `RE:`); Ausdruck buchstabengleich zu `regel.nach_betreff_tag` |
-| `scripts/` | `index_lauf.py`, `profil_lauf.py`, `trockenlauf.py` (Messung, `--nur-ki`), `intern_verteilen.py` (Sammelordner aufloesen), `regel_bericht.py` (Outlook-Regeln spiegeln + Hygiene), `test_regel.py` + `test_absender_pruefung.py` (40 + 47 Pruefungen ohne DB) |
+| `scripts/` | `index_lauf.py`, `profil_lauf.py`, `trockenlauf.py` (Messung, `--nur-ki`), `intern_verteilen.py` (Sammelordner aufloesen), `regel_bericht.py` (Outlook-Regeln spiegeln + Hygiene), `nachrichtentyp_nachtragen.py`, `test_regel.py` + `test_absender_pruefung.py` (46 + 57 Pruefungen ohne DB) |
 
 **Juengste-Hand-Regel** (`regel.nach_juengster_hand`, vor der Adress-Statistik, nicht fuer
 eigene Domain): zeigen die letzten `REGEL_JUENGSTE_HAND_N`=3 Handbewegungen von Mails
@@ -424,6 +428,20 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   nach `Einladungen`, 0 Fehler, per Graph gegengezaehlt (475 im Ordner).
   Protokolliert als Stufe `hart` mit Kategorie `auto-regel`, Begruendung nennt
   die Regel.
+- **Einladungen in `Move` gehen hart nach `Posteingang/Einladungen`**
+  (2026-10-05, auf Helmuts Frage „warum sind noch Einladungen in Move?").
+  Neue Einladungen haben bewusst keine Outlook-Regel; Helmut beantwortet sie im
+  Posteingang und zieht sie dann nach `Move` — dort fand sie keine Stufe
+  (Kollegen-Absender entscheidet Stufe 1 nie, eine Einladung beginnt einen
+  neuen Thread). Erkannt am Nachrichtentyp, den Graph im Delta als
+  `@odata.type` mitliefert (Migration 006), nie am Betreff. Gilt fuer alle
+  `eventMessage*`-Typen, also auch Zusagen und Absagen, die durch die
+  Outlook-Regeln rutschen. Erster Lauf: 10 Einladungen aus `Move` bewegt
+  (Jour fixe, KI-Vortreffen, Mitarbeitergespraech, Jubilaeum, RoHS). **Nicht
+  erfasst:** die Bookings-Mails „Neue Buchung: …" — das sind gewoehnliche Mails.
+- **KI halbscharf (2026-10-05, Go Helmut):** die KI-Stufe darf wegraeumen
+  (`nirgends` bei Erstkontakten → `Move/Unbestimmt`), aber nicht einsortieren.
+  Voll scharf erst, wenn `sicher` die 90 % erreicht (`KI_SICHER_BEWEGT='1'`).
 - **Der Worker legt fehlende Kategorien selbst an.**
 - **Newsletter werden normal einsortiert** (alle Stufen), erzeugen aber nie
   Ordnervorschlaege und zaehlen nicht in die thematische Verdichtung.
@@ -439,8 +457,9 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
 0. **Harte Ablage** (seit 2026-09-16): Post aus einem Ticket-System geht
    IMMER in dessen Ordner, egal worum es geht — keine Schwelle, keine
    Statistik. Erkannt an der Absender-Domain oder der Betreff-Marke
-   (`regel.HARTE_ABLAGE`). Derzeit nur Zendesk; die Liste ist so gebaut, dass
-   `Redmine, Planio, Slite` ohne Umbau dazukommen kann.
+   (`regel.HARTE_ABLAGE`). Zendesk, dazu seit 2026-10-05 **Einladungen**
+   (Nachrichtentyp `eventMessage*` → `Posteingang/Einladungen`). Die Liste ist so
+   gebaut, dass `Redmine, Planio, Slite` ohne Umbau dazukommen kann.
 1. **Adresse**, dann **Domain mit Subdomain-Rollup**: Mindestevidenz 2,
    Konzentration >= 0.8, Gewicht Hand=2 / auto=1 (erkennbar an der
    `auto-*`-Kategorie — eine weggeschobene auto-Mail ist eine Korrektur).
@@ -493,16 +512,27 @@ Block-Kit-Buttons mit signiertem Endpunkt hinter Caddy.
 - **`.env`** (chmod 600, Werte in Single-Quotes, nie per `source`):
   `SCHOEPSMAIL_DB_PASSWORD`, `GRAPH_CLIENT_SECRET`, `GRAPH_SECRET_ABLAUF`
   (`2028-09-14`), `SLACK_BOT_TOKEN`, `ANTHROPIC_API_KEY` (derselbe wie LifeOS),
-  Schalter `DRY_RUN='0'`, `NACHZIEHER_DRY_RUN='0'`, `SORTIERER_KI` (fehlt = 0),
+  Schalter `DRY_RUN='0'`, `NACHZIEHER_DRY_RUN='0'`, `SORTIERER_KI='1'` und
+  `KI_SICHER_BEWEGT='0'` (beide seit 2026-10-05, halbscharf; Sicherung der
+  vorherigen .env in `.env.bak-20261005`),
   `POSTEINGANG_DRY_RUN='0'` (seit 2026-09-17 10:14 scharf; fehlt = 1 = nur
   protokollieren).
   **Die .env wird nur beim Erzeugen des Containers gelesen** — nach einer
   Aenderung `docker compose up -d worker`, ein `restart` reicht nicht.
+  **Und sie kommt nur an, wenn die Variable in `docker-compose.yml` unter
+  `environment:` steht** — die .env wird nicht pauschal durchgereicht. Eine
+  neue Variable also immer auch dort eintragen und nach dem Start mit
+  `docker exec schoeps-mail-worker printenv <NAME>` pruefen. (Vorfall
+  2026-10-05: `KI_SICHER_BEWEGT='0'` stand in der .env, fehlte in compose; der
+  Code-Default 1 liess die KI 9 Mails einsortieren, 3 zogen per Thread nach.
+  Worker nach 1,5 min gestoppt, alle 12 per Skript zurueck nach `Move`, ohne
+  `auto-*`-Kategorie, protokolliert als Stufe `rueckbau`. Seitdem ist der
+  Default an beiden Stellen 0.)
 - **Deploy von Code:** `cd /opt/schoeps-mail && git pull && docker compose restart
   worker` — `src/`, `scripts/`, `migrations/` sind Bind-Mounts, kein Build noetig.
   Build nur bei `requirements.txt`/`Dockerfile`. Migrationen von Hand:
   `docker exec -i lifeos-postgres psql -U schoepsmail -d schoepsmail <
-  migrations/00N_x.sql` — eingespielt: 001, 002, 003, 004, 005.
+  migrations/00N_x.sql` — eingespielt: 001 bis 006.
 - **Skripte:** `docker compose run --rm -T --no-deps worker python scripts/<x>.py`
   (`PYTHONPATH=/app` steht in Compose und Dockerfile, `PYTHONUTF8=1` wegen `❶`).
 - **Beobachten:** `docker compose logs -f worker`; `worker_heartbeat` (`sortierer`
@@ -668,7 +698,10 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   nur noch eine Toni-ML-Listenmail durch. **Probe am echten Move (68 Mails,
   nichts bewegt):** 9 → `Unbestimmt` (wispr.ai 3x, printables, JTSE-Werbung,
   Telefon-Webinar, Ferchau, BMW, 1 ohne Absender), 15 bleiben, 44 nur
-  Protokoll. **Scharf ist es noch nicht** — `SORTIERER_KI` fehlt in der .env.
+  Protokoll. **Halbscharf seit 2026-10-05 vormittags** (siehe „Betrieb", dort
+  auch der Vorfall beim Einschalten). Was die KI als `sicher` sieht, steht mit
+  `dry_run = true` in `regel_entscheidung` — Grundlage fuer die naechste Messung
+  am echten Zufluss statt an der Historie.
 - **Regelhygiene im Postfach** (Befund oben, Aufraeumen ist Helmuts Entscheidung):
   2 Widersprueche (Regel legt in den Elternordner, er selbst in den Unterordner),
   1 doppelt belegte Adresse, 2 leere und 29 als fehlerhaft gemeldete Regeln
@@ -687,7 +720,7 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   mit Textlaenge/-anfang geloggt); Haiku erfindet gelegentlich Pfade (wird als
   unsicher verworfen — oder, wenn nur die Bereichsmarke fehlt, ueber
   `urteil.normpfad()` doch zugeordnet). Automatische Tests sind
-  `test_regel.py` (40) und `test_absender_pruefung.py` (47), beide ohne DB;
+  `test_regel.py` (46) und `test_absender_pruefung.py` (57), beide ohne DB;
   **DB-Tests fuer Bewegungslog, Nachzieher und die harte Ablage fehlen**
   (bisher nur Live-Tests und Messlaeufe gegen den Bestand).
 
@@ -698,11 +731,11 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
 | 0 | Zugang, Move, Kategorien, Slack | erledigt 2026-09-14 (Policy-Gegenprobe offen) |
 | 1 | Index (Ordnerbaum, Metadaten aller Ordner, Delta je Ordner), Konversationen, Ordnerprofile, **Trockenlauf-Messung**: 200 Mails aus Ordnern ziehen, Ordner verstecken, alle vier Stufen raten lassen; Ziel >= ~90 % Treffer bei `sicher` | gebaut + gelaufen 2026-09-14, siehe Befund |
 | 2 | Stufen 1–3 scharf, Kategorien, Schalter `DRY_RUN`; **dazu Bewegungslog, Juengste-Hand-Regel, Nachzieher** (Helmuts Wunsch vom 15.09.: Handablage soll auch rueckwaerts wirken) | **scharf seit 2026-09-15** (Sortierer 09:59, Nachzieher 14:43); Live-Tests 22 bzw. 6 Mails, alle Entscheidungen von Helmut bestaetigt |
-| 3 | Stufe 4 (KI) scharf, `Unbestimmt` als KI-Warteschlange, Protokoll mit Begruendungen | offen — Profile vorher schaerfen |
+| 3 | Stufe 4 (KI) scharf, `Unbestimmt` als KI-Warteschlange, Protokoll mit Begruendungen | **halbscharf seit 2026-10-05** (nur Wegraeumen); Einsortieren offen — `sicher` 57–73 %, Profile vorher schaerfen |
 | 4 | Vorschlaege A–C, Slack-Push, Bestaetigungsseite, Profile editierbar, Nachzieher-Vorschlaege fuer andere Themenordner | offen |
 | 5 | Alarme vervollstaendigen, Doku, DB-Tests | teils (Heartbeat + Slack-Alarm laufen) |
 
-Tests: `scripts/test_regel.py` (40) und `scripts/test_absender_pruefung.py` (47),
+Tests: `scripts/test_regel.py` (46) und `scripts/test_absender_pruefung.py` (57),
 beide ohne DB, im Container laufen lassen.
 Regel fuer kuenftige DB-Tests: nur eigene Testdaten (`ZZTEST…`), Aufraeumer loeschen
 nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenzt.
@@ -719,8 +752,13 @@ nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenz
   Sammelordner aufloesen, Trockenlauf als Default.
 - `regel_bericht.py [--nur-bericht]` — Outlook-Posteingangsregeln spiegeln und
   gegen die Ablage-Historie halten. `--nur-bericht` liest nur die DB.
-- `test_regel.py` — Logik-Tests ohne DB (40 Pruefungen, inkl. harte Ablage).
-- `test_absender_pruefung.py` — Vorfilter, `ziel_leer`, `nach_unbestimmt`, `normpfad` (47 Pruefungen ohne DB).
+- `nachrichtentyp_nachtragen.py [--ordner PFAD …]` — Nachrichtentyp (Migration 006)
+  fuer schon indizierte Mails nachtragen, frisches Delta ohne den gespeicherten
+  Link; Default `Posteingang/Move` und `Posteingang`.
+- `test_regel.py` — Logik-Tests ohne DB (46 Pruefungen, inkl. harte Ablage und Einladungen).
+- `test_absender_pruefung.py` — Vorfilter, `ziel_leer`, `nach_unbestimmt`, `normpfad`, halbscharf (57 Pruefungen ohne DB).
+- `trockenlauf.py` listet seit 2026-10-05 auch `nirgends`-Urteile an abgelegter
+  Post und ob das Bekannten-Netz sie haelt.
 - Phase 0: `graph_app_test.py` (Client-Credentials, Ordnerbaum, Negativtest,
   Kategorien), `graph_policy_wait.py` (pollt bis 403), `graph_delegiert_test.py`
   (Device-Code-Notnagel), `slack_test.py` (Bot-Token, Testnachricht). Lesen das
