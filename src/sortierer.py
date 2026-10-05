@@ -42,6 +42,9 @@ MOVE_PFAD = os.getenv("MOVE_PFAD", "Posteingang/Move")
 # bleiben diese Mails einfach in `Move` liegen.
 UNBESTIMMT_PFAD = os.getenv("UNBESTIMMT_PFAD", "Posteingang/Move/Unbestimmt")
 PROTOKOLL_PAUSE_MIN = int(os.getenv("PROTOKOLL_PAUSE_MIN", "360"))
+# So lange gilt ein KI-Urteil, bevor dieselbe Mail erneut an Haiku geht
+# (siehe kaskade.letztes_ki_urteil).
+KI_PAUSE_H = int(os.getenv("KI_PAUSE_H", "24"))
 KATEGORIEN = ["auto-regel", "auto-thread", "auto-ki", "auto-neu",
               kaskade.KATEGORIE_UNBESTIMMT, kaskade.KATEGORIE_UNINTERESSANT]
 # Quelle der groben Vorstufe: der Posteingang selbst, ohne Unterordner.
@@ -182,7 +185,7 @@ async def sortiere(graph: Graph, dry_run: bool = True, mit_ki: bool = False) -> 
     for m in mails:
         async with get_session() as s:
             e = await kaskade.entscheide(s, m, graph if mit_ki else None, mit_ki=mit_ki,
-                                         ordnerliste=ordnerliste)
+                                         ordnerliste=ordnerliste, ki_pause_h=KI_PAUSE_H)
         schl = e["stufe"] if e["stufe"] != "ki" else f"ki/{e.get('sicherheit')}"
         z[schl] += 1
         if kaskade.bewegt(e) and not dry_run:
@@ -199,7 +202,7 @@ async def sortiere(graph: Graph, dry_run: bool = True, mit_ki: bool = False) -> 
         if kaskade.nach_unbestimmt(e) and unbestimmt is not None:
             ziel = {**e, "ordner_id": unbestimmt[0], "ziel_pfad": unbestimmt[1]}
             if dry_run:
-                if not await _schon_protokolliert(m["id"], ziel):
+                if not e.get("aus_cache") and not await _schon_protokolliert(m["id"], ziel):
                     async with get_session() as s:
                         await kaskade.protokolliere(s, m["id"], ziel, dry_run=True)
                     log.info("(dry) ⇢ %s  %r", unbestimmt[1], (m["betreff"] or "")[:60])
@@ -212,9 +215,13 @@ async def sortiere(graph: Graph, dry_run: bool = True, mit_ki: bool = False) -> 
                 log.error("Wegraeumen fehlgeschlagen fuer %r: %s", (m["betreff"] or "")[:60], exc)
                 z["move_fehler"] += 1
             continue
-        if not await _schon_protokolliert(m["id"], e):
+        # Ein wiederverwendetes KI-Urteil steht schon im Protokoll; ein neuer
+        # Eintrag wuerde es verjuengen und die Mail nie wieder anfragen lassen.
+        if not e.get("aus_cache") and not await _schon_protokolliert(m["id"], e):
             async with get_session() as s:
                 await kaskade.protokolliere(s, m["id"], e, dry_run=True)
-            if kaskade.bewegt(e):
+            if e["stufe"] == "ki" and e.get("sicherheit") == kaskade.KI_BEWEGT_AB:
+                log.info("(nur Protokoll) → %s  [ki]  %r", e["ziel_pfad"], (m["betreff"] or "")[:60])
+            elif kaskade.bewegt(e):
                 log.info("(dry) → %s  [%s]  %r", e["ziel_pfad"], e["stufe"], (m["betreff"] or "")[:60])
     return z

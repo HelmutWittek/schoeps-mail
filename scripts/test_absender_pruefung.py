@@ -87,6 +87,18 @@ pruefe(kaskade.kategorie({"stufe": "ki", "sicherheit": "nirgends"}) == "auto-unb
 pruefe(kaskade.kategorie({"stufe": "ki", "sicherheit": "sicher"}) == "auto-ki",
        "ein sicheres KI-Urteil behaelt auto-ki")
 
+# Halbscharfer Betrieb (2026-10-05): KI raeumt nur weg, `sicher` wird nur protokolliert
+pruefe(kaskade.bewegt({"stufe": "ki", "sicherheit": "sicher", "ordner_id": "x"}),
+       "per Default bewegt ein sicheres KI-Urteil")
+kaskade.KI_SICHER_BEWEGT = False
+pruefe(not kaskade.bewegt({"stufe": "ki", "sicherheit": "sicher", "ordner_id": "x"}),
+       "mit KI_SICHER_BEWEGT=0 bewegt `sicher` nicht")
+pruefe(kaskade.nach_unbestimmt({"stufe": "ki", "sicherheit": "nirgends"}),
+       "mit KI_SICHER_BEWEGT=0 wird `nirgends` weiter weggeraeumt")
+pruefe(kaskade.bewegt({"stufe": "thread", "ordner_id": "x"}),
+       "der Schalter beruehrt Stufe 1–3 nicht")
+kaskade.KI_SICHER_BEWEGT = True
+
 # Grobe Vorstufe im Posteingang (uninteressant.py, 2026-09-17)
 pruefe(kaskade.bewegt({"stufe": "uninteressant", "ordner_id": "x"}),
        "die Uninteressant-Stufe bewegt")

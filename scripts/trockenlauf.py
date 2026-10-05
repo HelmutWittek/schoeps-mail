@@ -71,6 +71,10 @@ async def main(n: int, monate: int, mit_ki: bool, seed: float, zeige: int, nur_k
     graph = Graph() if mit_ki else None
     je_stufe: dict[str, Counter] = defaultdict(Counter)
     fehler: list[tuple[str, str, str, str]] = []
+    # `nirgends` an abgelegter Post: die Mail gehoert ja in einen Ordner. Das
+    # ist der Fehler, der im halbscharfen Betrieb (KI_SICHER_BEWEGT=0) echte
+    # Post nach `Move/Unbestimmt` wegraeumen wuerde.
+    verworfen: list[tuple[str, str, str]] = []
     tokens_in = tokens_out = 0
     try:
         async with get_session() as s:
@@ -86,6 +90,9 @@ async def main(n: int, monate: int, mit_ki: bool, seed: float, zeige: int, nur_k
                 tokens_out += e["tokens"]["out"]
             if not e.get("ordner_id"):
                 je_stufe[schl]["offen"] += 1
+                if schl == "ki/nirgends":
+                    verworfen.append((m["pfad"], m.get("von_adresse") or "",
+                                      (m["betreff"] or "")[:60]))
             elif e["ordner_id"] == m["ordner_id"]:
                 je_stufe[schl]["richtig"] += 1
             else:
@@ -115,6 +122,10 @@ async def main(n: int, monate: int, mit_ki: bool, seed: float, zeige: int, nur_k
     if mit_ki:
         kosten = tokens_in / 1e6 * 1.0 + tokens_out / 1e6 * 5.0
         print(f"Haiku-Tokens: in={tokens_in} out={tokens_out} ≈ {kosten:.3f} USD (ohne Cache-Rabatt)")
+    if verworfen:
+        print(f"\nAls `nirgends` verworfen, obwohl abgelegt ({len(verworfen)}):")
+        for ist, von, betreff in verworfen:
+            print(f"  liegt in: {ist}\n      {von}  {betreff!r}")
     if fehler:
         print(f"\nFehlgriffe (max. {zeige}):")
         for schl, ist, soll, betreff in fehler[:zeige]:

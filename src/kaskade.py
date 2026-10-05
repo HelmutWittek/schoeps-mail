@@ -12,6 +12,7 @@ Mail in ihren Ordner sortiert, wenn sie sie nicht schon kennen wuerde?"
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from sqlalchemy import text
@@ -24,6 +25,11 @@ log = logging.getLogger("schoepsmail.kaskade")
 
 # Sicherheit, ab der Stufe 4 bewegen darf.
 KI_BEWEGT_AB = "sicher"
+# Halbscharfer Betrieb (Vorschlag 2026-10-05): mit `KI_SICHER_BEWEGT=0` raeumt
+# die KI nur weg (`nirgends` → `Move/Unbestimmt`), ein `sicher` mit Zielordner
+# wird nur protokolliert. Grund: `nirgends` hat im Gegentest keine echte
+# Geschaeftspost verworfen, die Ordnerwahl bei `sicher` liegt dagegen unter 90 %.
+KI_SICHER_BEWEGT = os.getenv("KI_SICHER_BEWEGT", "1") != "0"
 
 # Marke fuer alles, was der Sortierer nach `Move/Unbestimmt` wegraeumt.
 KATEGORIE_UNBESTIMMT = "auto-unbestimmt"
@@ -38,10 +44,40 @@ def _unklar(begruendung: str, kandidaten: list[dict[str, Any]],
             "vorfilter": vorfilter}
 
 
+async def letztes_ki_urteil(s: AsyncSession, mail_id: str, stunden: int) -> dict[str, Any] | None:
+    """Juengstes protokolliertes KI-Urteil dieser Mail, wenn juenger als `stunden`.
+
+    Der Sortierer bewertet `Move` alle 2 Minuten neu. Ohne diese Wiederverwendung
+    ginge jede liegengebliebene Mail in jedem Zyklus erneut an Haiku — bei 50
+    Mails ueber 30.000 Aufrufe am Tag. Stufe 1–3 laufen davor weiter in jedem
+    Zyklus, neue Evidenz schlaegt das alte Urteil also sofort.
+    """
+    r = await s.execute(text("""
+        SELECT ziel_ordner_id, ziel_pfad, sicherheit, begruendung
+          FROM regel_entscheidung
+         WHERE mail_id = :m AND stufe = 'ki'
+           AND am > now() - make_interval(hours => CAST(:h AS integer))
+         ORDER BY am DESC LIMIT 1
+    """), {"m": mail_id, "h": stunden})
+    row = r.fetchone()
+    if not row:
+        return None
+    nirgends = row[2] == "nirgends"
+    # Bei `nirgends` steht im Protokoll `Move/Unbestimmt` als Ziel — das ist die
+    # Ablage des Sortierers, nicht das Urteil.
+    return {"stufe": "ki", "ordner_id": None if nirgends else row[0],
+            "ziel_pfad": None if nirgends else row[1], "sicherheit": row[2], "anteil": None,
+            "begruendung": row[3], "aus_cache": True}
+
+
 async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None = None,
                      ohne_mail_id: str | None = None, mit_ki: bool = True,
-                     ordnerliste: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    """`mail` braucht: id, von_adresse, von_domain, conversation_id, betreff, vorschau, an, von_name."""
+                     ordnerliste: list[dict[str, Any]] | None = None,
+                     ki_pause_h: int = 0) -> dict[str, Any]:
+    """`mail` braucht: id, von_adresse, von_domain, conversation_id, betreff, vorschau, an, von_name.
+
+    `ki_pause_h` > 0: ein KI-Urteil, das juenger ist, wird wiederverwendet statt
+    neu angefragt (`aus_cache`). Der Trockenlauf laesst es bei 0."""
     # Stufe 1
     t = await regel.entscheide_statistik(s, mail.get("von_adresse"), mail.get("von_domain"),
                                          ohne_mail_id, betreff=mail.get("betreff"))
@@ -68,6 +104,10 @@ async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None 
     if verdacht:
         log.info("Vorfilter haelt Mail an: %s", verdacht)
         return _unklar(f"Absender-Vorfilter: {verdacht}", kandidaten, vorfilter=True)
+    if ki_pause_h > 0:
+        alt = await letztes_ki_urteil(s, mail["id"], ki_pause_h)
+        if alt:
+            return {**alt, "kandidaten": kandidaten}
     text_ = ""
     if graph is not None:
         try:
@@ -86,7 +126,7 @@ def bewegt(e: dict[str, Any]) -> bool:
         return False
     if e["stufe"] in ("hart", "uninteressant", "adresse", "domain", "thread"):
         return True
-    return e["stufe"] == "ki" and e.get("sicherheit") == KI_BEWEGT_AB
+    return e["stufe"] == "ki" and e.get("sicherheit") == KI_BEWEGT_AB and KI_SICHER_BEWEGT
 
 
 def kategorie(e: dict[str, Any]) -> str:
