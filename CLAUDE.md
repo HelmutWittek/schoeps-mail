@@ -810,6 +810,16 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   geblieben, 3,21 USD. 1 Fehler: `ErrorMessageSizeExceeded` (Mail zu gross fuer
   das Setzen der Kategorie, bleibt liegen). **`SCHOEPS intern` danach: 823
   Mails**, Graph = Index. Von 7.762 am 14.09. sind damit ~89 % verteilt.
+- **Rest umbenannt (2026-10-05 abends):** Helmut hat den Ordner fertig
+  aufgeraeumt, nach **`❻ Verwaltung/SCHOEPS intern nicht zugeordnet`**
+  verschoben und umbenannt — „soll kein Zielordner werden" (`Done` hat er
+  geloescht). Weil `SAMMELORDNER_PFADE` am Pfad haengt, war er bis zum
+  Nachziehen kurz Zielordner (keine Fehlsortierung). Seitdem
+  `index.fehlende_sonderpfade()` nach jedem Voll-Sync mit Slack-Alarm
+  `sonderpfad`. Letzter Lauf mit Thread + KI (`--ki-bewegt`): 394 Mails, 120 KI +
+  53 Thread + 1 Adresse bewegt, 181 `unsicher` + 39 `nirgends` bleiben, 0,42 USD,
+  wieder 1x `ErrorMessageSizeExceeded` (dieselbe Mail). **Rest 221, Graph =
+  Index — bleibt liegen** (Helmut: „lass den Rest einfach liegen").
 - **`Move/Unbestimmt`** als KI-Warteschlange nutzen, sobald Phase 3 laeuft.
 - **Lokale Geheimnis-Dateien** `C:\PROJEKTE\graph_secret.txt` und
   `C:\PROJEKTE\Slack token.txt` liegen noch — beide stehen in der VPS-.env;
@@ -847,7 +857,7 @@ nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenz
   die Historie je Stufe; `--nur-ki` misst die KI auf Faellen, die Stufe 1–3 offen
   lassen; `-e ANTHROPIC_MODELL=claude-sonnet-5` fuer den Modellvergleich.
 - `intern_verteilen.py [--ohne-ki] [--ausfuehren] [--limit] [--monate]` —
-  Sammelordner aufloesen, Trockenlauf als Default.
+  Sammelordner aufloesen, Trockenlauf als Default; Default-Pfad `❻ Verwaltung/SCHOEPS intern nicht zugeordnet`, `--ki-bewegt` laesst KI-`sicher` nur in diesem Lauf bewegen.
 - `regel_bericht.py [--nur-bericht]` — Outlook-Posteingangsregeln spiegeln und
   gegen die Ablage-Historie halten. `--nur-bericht` liest nur die DB.
 - `nachrichtentyp_nachtragen.py [--ordner PFAD …]` — Nachrichtentyp (Migration 006)
