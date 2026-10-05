@@ -40,6 +40,7 @@ Kalender-Sync/n8n, beide an derselben App-Registration) — Regeln unten unter
 | `migrations/001_index.sql` | `ordner`, `mail`, Sicht `mail_evidenz` (Gewicht Hand=2/auto=1), `regel_entscheidung`, `worker_heartbeat` |
 | `migrations/002_evidenz_betreff.sql` | `betreff` in der Evidenz-Sicht + Ausdrucks-Index fuer die Betreff-Marke |
 | `migrations/003_mail_bewegung.sql` | **Bewegungslog**: jeder Ordnerwechsel, `quelle` `'hand'` (per Delta gesehen) oder `'worker'` (eigener Move, in `sortierer.verschiebe` geschrieben — der Index sieht die Mail danach schon im Ziel und meldet keinen Wechsel). Graph kennt kein „wer"; das Audit-Log von Exchange waere Purview-only mit 24 h Verzug |
+| `src/oof_nachtrag.py` | **Abwesenheitsnotizen aus dem eigenen Tenant nachtragen (seit 2026-10-05):** Graph liefert sie nicht im Delta (siehe Graph-Luecke unter „Zugang"); je Voll-Sync Suche in `Move` + Sammelordnern, ImmutableId per `$filter` auf die internetMessageId, Eintrag ueber `index._schreibe_seite` |
 | `src/outlook_regeln.py` | **Spiegel der Outlook-Posteingangsregeln (seit 2026-09-17):** `spiegle()` holt `mailFolders/inbox/messageRules` (nur lesend, geaendert wird im Postfach), `hygiene()` haelt sie gegen die Ablage-Historie — Ziel geloescht, leer, doppelt, Widerspruch, Wissen ohne Evidenz, eingeschlafen |
 | `migrations/006_nachrichtentyp.sql` | `mail.nachrichtentyp` = Graph-`@odata.type` ohne Namensraum (`eventMessageRequest`/`-Response`/`eventMessage`, NULL = gewoehnliche Mail); kommt im Delta ohnehin mit |
 | `migrations/005_outlook_regel.sql` | Tabelle `outlook_regel` + Sicht `outlook_regel_absender` (je Absenderangabe einer Regel eine Zeile; `sentToAddresses` bewusst nicht) |
@@ -199,6 +200,16 @@ Datenhaltung durch Helmut am 2026-09-14** (siehe Entscheidungen).
   `MailboxSettings.ReadWrite` (mit `Mail.ReadWrite` allein: 403), Zuweisen an
   Mails nicht. Ordnernamen enthalten `❶…❾` — Konsole/Logs auf UTF-8
   (`PYTHONUTF8=1`), sonst `UnicodeEncodeError` beim ersten Ordnerbaum.
+- **Graph-Luecke Abwesenheitsnotizen (gefunden 2026-10-05):** OOF-Antworten von
+  Kollegen im eigenen Tenant (Klasse `IPM.Note.Rules.OofTemplate.Microsoft`)
+  liefert Graph **weder im Delta noch in der Ordnerliste** — nur `$search`
+  findet sie, und `$filter=internetMessageId eq '…'` im Ordner. Externe OOFs
+  sind `IPM.Note` und kommen normal. Weitere Fallen dabei: `$search` liefert
+  die **REST-ID** (`AAMk…`) trotz `Prefer: IdType`, der Einzelabruf gibt die ID
+  zurueck, mit der man fragt, und `translateExchangeIds` antwortet der App mit
+  403. Nur der `$filter` auf die internetMessageId liefert die ImmutableId.
+  Umgesetzt in `src/oof_nachtrag.py` (je Voll-Sync fuer `Move` und
+  Sammelordner, `mail.nachrichtentyp = 'oofTemplate'`).
 
 ## Kalender-Sync nach Google (n8n, seit 2026-09-15)
 
@@ -786,6 +797,15 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   naechsten Voll-Sync nach (bis 16 min), eine Graph/Index-Differenz direkt nach
   einem Lauf ist also kein Fehler, solange die fehlenden Mails ohne `auto-*` in
   Zielordnern liegen.
+- **`SCHOEPS intern` nach Thema mit KI (2026-10-05, Helmut: „Der Rest sind
+  wirklich SCHOEPS-interne Mails → Aufraeumen nach Thema, wenn moeglich"):**
+  `intern_verteilen.py --ki-bewegt` laesst KI-`sicher` NUR in diesem Lauf
+  bewegen (Worker bleibt halbscharf). Stichprobe 100 ohne Bewegen: 74 `sicher`,
+  20 `unsicher`, 6 `nirgends`, beim Lesen ~4 von 5 plausibel (keine Quote
+  messbar — diese Mails lagen nie in einem Themenordner). **Stichprobe scharf,
+  500 Mails (Go Helmut):** 315 KI + 55 Thread bewegt, 0 Fehler, 0,59 USD; danach
+  10 Thread-Geschwister. Graph = Index (2.705). **Wartet auf Helmuts Durchsicht**
+  (Kategorie `auto-ki`), bevor der Rest laeuft.
 - **`Move/Unbestimmt`** als KI-Warteschlange nutzen, sobald Phase 3 laeuft.
 - **Lokale Geheimnis-Dateien** `C:\PROJEKTE\graph_secret.txt` und
   `C:\PROJEKTE\Slack token.txt` liegen noch — beide stehen in der VPS-.env;
