@@ -69,6 +69,12 @@ ANBIETER_DOMAINS = {
     "klaviyomail.com", "emarsys.net", "responsys.net", "exacttarget.com",
     # Kollaboration mit Nutzer-Adressen unter geteilter Domain
     "slack.com", "asana.com", "atlassian.net", "planio.com", "docusign.net",
+    # Projekt- und Wiki-Werkzeuge: die Benachrichtigung sagt nichts ueber das
+    # Thema. Bis 2026-10-05 verdeckte der Sammelordner `Redmine, Planio, Slite`
+    # das; als er aus der Evidenz fiel, schickte die Domain-Statistik
+    # ZIM-Projekt-Aufgaben nach `…/Software` (plan.io 92 %) und haette
+    # Slite-Erwaehnungen nach `Personal/Riekehof Emails` geschickt (95 %).
+    "plan.io", "slite.com",
 }
 
 

@@ -35,6 +35,8 @@ pruefe(regel.ist_eigene("schoeps.de") and regel.ist_eigene("mail.schoeps.de"), "
 pruefe(not regel.ist_eigene("schoeps-fan.de"), "aehnlicher Name ist nicht eigene Domain")
 pruefe(regel.ist_anbieter("support.zendesk.com") and regel.ist_anbieter("gmail.com"), "Anbieter inkl. Subdomain")
 pruefe(not regel.ist_anbieter("sennheiser.com"), "Hersteller ist kein Anbieter")
+pruefe(regel.regel_kandidaten("plan.io") == [] and regel.regel_kandidaten("slite.com") == [],
+       "Projekt-Werkzeuge plan.io/slite.com entscheiden nie ueber die Domain (2026-10-05)")
 
 pruefe(regel.regel_kandidaten("schoeps.zendesk.com") == ["schoeps.zendesk.com"],
        "Anbieter: Subdomain darf entscheiden, Rollup stoppt vor zendesk.com")
