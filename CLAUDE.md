@@ -443,7 +443,7 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   Zuordnungen — Outlook-Regel bei der Zustellung, `HARTE_ABLAGE` im Worker —
   gehen vor Statistik und KI. Wo ein Merkmal eindeutig ist, zuerst eine Regel
   vorschlagen.
-- **`Posteingang/Redmine, Planio, Slite` ist Zielordner** (Helmut 2026-10-05,
+- **`Posteingang/Redmine, Planio, Slite` (seit 2026-10-05 „…, Scanner") ist Zielordner** (Helmut 2026-10-05,
   nach einer Stunde als Sammelordner zurueckgenommen: „darf Ziel sein, fuer
   solche oder aehnliche Mails"). Gefuellt von drei Outlook-Regeln
   (`redmine@schoeps.de`, `hello@slite.com`, `senderContains PLAN.IO`) und der
@@ -466,11 +466,18 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   Laeuft NACH Adresse/Domain/Thread — liegt der Thread schon in einem
   bestimmten Ordner, gewinnt der. „Automatische Antwort:"/„Automatic reply:" →
   `Posteingang/Einladungen`; `mikroforum@schoeps.de` → `❺ Ausstellung/Mikroforum
-  SCHOEPS` (Jahrgang nur ueber den Thread). **Offen:** Scanner
-  (`1og-entwicklung@`, `1og-service_support_entwicklung@`, „Attached Image",
-  75 Mails) und „Einlesen:" von `powerautomate@schoeps.de` (25, Gegenstueck zu
-  640 eigenen in Gesendet) — Zielordner fehlen. „Per E-Mail senden:" ist
-  KEINE Regel: alte Kollegen-Mails mit Anhang, thematisch verschieden.
+  SCHOEPS` (Jahrgang nur ueber den Thread). **Scanner** (`1og-entwicklung@`,
+  `1og-service_support_entwicklung@`, „Attached Image") geht seit 2026-10-05
+  hart in den Redmine-Ordner, den Helmut dafuer in **„Redmine, Planio, Slite,
+  Scanner"** umbenannt hat. **Offen:** „Einlesen:" von `powerautomate@schoeps.de`
+  (25, Gegenstueck zu 640 eigenen in Gesendet) — Zielordner fehlt. „Per E-Mail
+  senden:" ist KEINE Regel: alte Kollegen-Mails mit Anhang, thematisch verschieden.
+- **Feste Regeln zeigen ueber den PFAD auf ihren Ordner.** Benennt Helmut einen
+  Ordner um, faellt die Regel sonst still aus (beinahe passiert bei der
+  Scanner-Umbenennung). Seit 2026-10-05: `regel.fehlende_ziele()` nach jedem
+  Voll-Sync mit Slack-Alarm `regel-ziel`, dazu eine Log-Warnung je Pfad in
+  `nach_harter_ablage`. Nach einer Umbenennung den Pfad in `regel.py`
+  nachziehen.
 - **`❻ Verwaltung/Personal/Riekehof Emails` ist Altablage** (Helmut 2026-10-05:
   „darf nie Zielordner sein, ist legacy"). `index.ALTABLAGE_PFADE`: Arbeitsordner
   (nie Ziel, nie Evidenz, nicht in der KI-Ordnerliste), aber anders als ein
@@ -772,8 +779,8 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   3.738, `Einladungen` 2.341, Index identisch, alle 1.250 mit `auto-*`.
   **Rest 3.738** sind Kollegen-Diskussionen (fleing, gundert, schaefer,
   einkauf …), die Thread und feste Regeln nicht erreichen — nur die KI oder
-  Helmuts Hand (Nachzieher). Offen: Scanner- und „Einlesen:"-Mails (~100),
-  sobald ihre Zielordner feststehen.
+  Helmuts Hand (Nachzieher). Danach Scanner: 88 weitere (75 Scanner, 12
+  Thread, 1 Adresse), Rest **3.650**, Graph = Index. Offen: 25 „Einlesen:".
 - **`Move/Unbestimmt`** als KI-Warteschlange nutzen, sobald Phase 3 laeuft.
 - **Lokale Geheimnis-Dateien** `C:\PROJEKTE\graph_secret.txt` und
   `C:\PROJEKTE\Slack token.txt` liegen noch — beide stehen in der VPS-.env;
