@@ -215,14 +215,31 @@ HARTE_ABLAGE: list[dict[str, Any]] = [
             if t.strip()
         ),
     },
+    # Einladungen, Zusagen, Absagen (Helmut 2026-10-05). Neue Einladungen
+    # bleiben bewusst im Posteingang (keine Outlook-Regel), damit er sie
+    # beantwortet; was er danach nach `Move` zieht, hat er gesehen. Erkannt nur
+    # am Nachrichtentyp (Migration 006) — Kollegen-Absender und neuer Thread
+    # liessen sie sonst durch alle Stufen fallen. Die Kalenderverfolgung macht
+    # Exchange bei der Zustellung, der Ordner aendert daran nichts.
+    {
+        "name": "einladung",
+        "pfad": os.getenv("EINLADUNG_PFAD", "Posteingang/Einladungen"),
+        "domains": (),
+        "marken": (),
+        "typ_praefix": "eventMessage",
+    },
 ]
 
 
-def harte_ablage(von_domain: str | None, betreff: str | None) -> dict[str, Any] | None:
+def harte_ablage(von_domain: str | None, betreff: str | None,
+                 nachrichtentyp: str | None = None) -> dict[str, Any] | None:
     """Greift eine harte Ablage-Regel? Reine Logik, liefert die Regel oder None."""
     kand = domain_kandidaten(von_domain or "")
     tag = betreff_tag(betreff)
     for regel in HARTE_ABLAGE:
+        praefix = regel.get("typ_praefix")
+        if praefix and nachrichtentyp and nachrichtentyp.startswith(praefix):
+            return {**regel, "grund": f"Nachrichtentyp {nachrichtentyp}"}
         if any(d in kand for d in regel["domains"]):
             return {**regel, "grund": f"Absender-Domain {von_domain}"}
         if tag and tag in regel["marken"]:
@@ -230,14 +247,14 @@ def harte_ablage(von_domain: str | None, betreff: str | None) -> dict[str, Any] 
     return None
 
 
-async def nach_harter_ablage(s: AsyncSession, von_domain: str | None, betreff: str | None
-                             ) -> dict[str, Any] | None:
+async def nach_harter_ablage(s: AsyncSession, von_domain: str | None, betreff: str | None,
+                             nachrichtentyp: str | None = None) -> dict[str, Any] | None:
     """Stufe 0: Ticket-System erkannt -> fester Zielordner, ohne Statistik.
 
     Fehlt der Zielordner im Index, greift die Regel nicht und die Kaskade
     laeuft normal weiter — nie raten, nie einen Ordner erfinden.
     """
-    treffer = harte_ablage(von_domain, betreff)
+    treffer = harte_ablage(von_domain, betreff, nachrichtentyp)
     if not treffer:
         return None
     r = await s.execute(text("SELECT id FROM ordner WHERE pfad = :p AND verschwunden_am IS NULL"),
@@ -336,8 +353,8 @@ async def nach_domain(s: AsyncSession, domain: str, ohne_mail_id: str | None = N
 
 
 async def entscheide_statistik(s: AsyncSession, von_adresse: str | None, von_domain: str | None,
-                               ohne_mail_id: str | None = None, betreff: str | None = None
-                               ) -> dict[str, Any] | None:
+                               ohne_mail_id: str | None = None, betreff: str | None = None,
+                               nachrichtentyp: str | None = None) -> dict[str, Any] | None:
     """Stufe 0 und 1: harte Ablage, dann Adresse, Betreff-Marke, Domain.
 
     Die harte Ablage (Ticket-Systeme) laeuft VOR allem anderen und kennt keine
@@ -346,7 +363,7 @@ async def entscheide_statistik(s: AsyncSession, von_adresse: str | None, von_dom
     Eigene Domains: nur die strenge Adress-Regel (Systemadressen) und die
     Betreff-Marke — nie die Domain, nie die lockere Adress-Statistik.
     """
-    t = await nach_harter_ablage(s, von_domain, betreff)
+    t = await nach_harter_ablage(s, von_domain, betreff, nachrichtentyp)
     if t:
         return t
     if not von_adresse:

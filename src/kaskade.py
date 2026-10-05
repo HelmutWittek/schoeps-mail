@@ -81,7 +81,8 @@ async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None 
     neu angefragt (`aus_cache`). Der Trockenlauf laesst es bei 0."""
     # Stufe 1
     t = await regel.entscheide_statistik(s, mail.get("von_adresse"), mail.get("von_domain"),
-                                         ohne_mail_id, betreff=mail.get("betreff"))
+                                         ohne_mail_id, betreff=mail.get("betreff"),
+                                         nachrichtentyp=mail.get("nachrichtentyp"))
     if t:
         return {**t, "sicherheit": "sicher", "kandidaten": []}
 

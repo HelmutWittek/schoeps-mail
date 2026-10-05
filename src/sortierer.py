@@ -51,7 +51,7 @@ KATEGORIEN = ["auto-regel", "auto-thread", "auto-ki", "auto-neu",
 POSTEINGANG_PFAD = os.getenv("POSTEINGANG_PFAD", "Posteingang")
 
 FELDER = ("m.id, m.ordner_id, m.conversation_id, m.von_adresse, m.von_name, m.von_domain, "
-          "m.an, m.betreff, m.vorschau, m.empfangen_am, m.kategorien")
+          "m.an, m.betreff, m.vorschau, m.empfangen_am, m.kategorien, m.nachrichtentyp")
 
 
 async def ordner_nach_pfad(pfad: str) -> tuple[str, str] | None:

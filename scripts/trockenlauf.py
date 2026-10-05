@@ -28,7 +28,8 @@ from src.graph import Graph
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-FELDER = "id, ordner_id, conversation_id, von_adresse, von_name, von_domain, an, betreff, vorschau, empfangen_am"
+FELDER = ("id, ordner_id, conversation_id, von_adresse, von_name, von_domain, an, betreff, vorschau, "
+          "empfangen_am, nachrichtentyp")
 
 
 async def stichprobe(n: int, monate: int, seed: float) -> list[dict]:

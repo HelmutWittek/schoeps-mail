@@ -83,6 +83,18 @@ pruefe(regel.harte_ablage("kunde.de", "AW: [Schoeps Mikrofone] #64814: Frage") i
 pruefe(regel.harte_ablage("kunde.de", "Frage zum CMC 6") is None, "normale Mail trifft nicht")
 pruefe(regel.harte_ablage("kunde.de", "[Redmine] Ticket 12") is None, "fremde Marke trifft nicht")
 pruefe(regel.harte_ablage(None, None) is None, "leere Felder treffen nicht")
+
+# Einladungen (2026-10-05): nur am Nachrichtentyp erkannt
+pruefe(regel.harte_ablage("schoeps.de", "Sales Jour fixe", "eventMessageRequest")["name"] == "einladung",
+       "Einladung eines Kollegen trifft hart")
+pruefe(regel.harte_ablage("kunde.de", "Angenommen: Termin", "eventMessageResponse")["name"] == "einladung",
+       "Zusage trifft hart")
+pruefe(regel.harte_ablage("kunde.de", "Abgesagt: Termin", "eventMessage")["name"] == "einladung",
+       "Absage (eventMessage) trifft hart")
+pruefe(regel.harte_ablage("schoeps.de", "KI Jourfixe", None) is None,
+       "ohne Nachrichtentyp keine Einladung — der Betreff allein entscheidet nie")
+pruefe(regel.harte_ablage("schoeps.de", "Neue Buchung: Carl Denne", "message") is None,
+       "gewoehnliche Mail trifft nicht")
 pruefe(regel.harte_ablage("sennheiser.com", None) is None, "Wettbewerber trifft nicht")
 pruefe(kaskade.bewegt({"stufe": "hart", "ordner_id": "x"}), "harte Ablage bewegt")
 pruefe(kaskade.kategorie({"stufe": "hart"}) == "auto-regel", "harte Ablage bekommt auto-regel")

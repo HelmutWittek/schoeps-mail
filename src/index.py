@@ -83,6 +83,17 @@ def _adresse(ea: dict[str, Any] | None) -> tuple[str | None, str | None]:
     return adr, name
 
 
+def nachrichtentyp(m: dict[str, Any]) -> str | None:
+    """Graph-Typ ohne Namensraum, None fuer eine gewoehnliche Mail (Migration 006).
+
+    Einladungen, Zusagen und Absagen kommen als `eventMessageRequest`,
+    `eventMessageResponse` bzw. `eventMessage` — das Merkmal, das der Betreff
+    nicht traegt.
+    """
+    typ = (m.get("@odata.type") or "").rsplit(".", 1)[-1]
+    return None if typ in ("", "message") else typ
+
+
 def _mail_zeile(m: dict[str, Any]) -> dict[str, Any]:
     adr, name = _adresse(m.get("from"))
     an = [a for a, _ in (_adresse(r) for r in (m.get("toRecipients") or [])) if a]
@@ -102,6 +113,7 @@ def _mail_zeile(m: dict[str, Any]) -> dict[str, Any]:
         "kategorien": list(m.get("categories") or []),
         "ist_gelesen": m.get("isRead"),
         "hat_anhang": m.get("hasAttachments"),
+        "nachrichtentyp": nachrichtentyp(m),
     }
 
 
@@ -200,10 +212,10 @@ async def _schreibe_seite(s: AsyncSession, ordner_id: str, eintraege: list[dict[
             INSERT INTO mail (id, ordner_id, conversation_id, internet_message_id,
                               von_adresse, von_name, von_domain, an, betreff, vorschau,
                               empfangen_am, gesendet_am, kategorien, ist_gelesen, hat_anhang,
-                              entfernt_am, gesehen_am, aktualisiert_am)
+                              nachrichtentyp, entfernt_am, gesehen_am, aktualisiert_am)
             VALUES (:id, :ordner_id, :conversation_id, :imid, :von_adresse, :von_name, :von_domain,
                     :an, :betreff, :vorschau, :empfangen_am, :gesendet_am, :kategorien,
-                    :ist_gelesen, :hat_anhang, NULL, now(), now())
+                    :ist_gelesen, :hat_anhang, :nachrichtentyp, NULL, now(), now())
             ON CONFLICT (id) DO UPDATE SET
                 ordner_id = EXCLUDED.ordner_id, conversation_id = EXCLUDED.conversation_id,
                 internet_message_id = EXCLUDED.internet_message_id,
@@ -212,6 +224,7 @@ async def _schreibe_seite(s: AsyncSession, ordner_id: str, eintraege: list[dict[
                 vorschau = EXCLUDED.vorschau, empfangen_am = EXCLUDED.empfangen_am,
                 gesendet_am = EXCLUDED.gesendet_am, kategorien = EXCLUDED.kategorien,
                 ist_gelesen = EXCLUDED.ist_gelesen, hat_anhang = EXCLUDED.hat_anhang,
+                nachrichtentyp = EXCLUDED.nachrichtentyp,
                 entfernt_am = NULL, aktualisiert_am = now()
         """), z)
         neu_oder_geaendert += 1
