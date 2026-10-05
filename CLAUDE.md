@@ -461,15 +461,24 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   `ki_dienste` (Claude, OpenAI, Apps-Script-Fehler → `❻ …/AI, Automation`),
   Bookings („Neue/Aktualisierte/Stornierte Buchung:", „New booking:" …) →
   `Posteingang/Einladungen`. Erster Lauf: 5 + 2 Mails aus Move.
+- **Auffang-Regeln nach Stufe 2** (Helmut 2026-10-05, „wenn nicht spezifisch
+  moeglich"): `regel.AUFFANG_ABLAGE`, Stufe `auffang`, Kategorie `auto-regel`.
+  Laeuft NACH Adresse/Domain/Thread — liegt der Thread schon in einem
+  bestimmten Ordner, gewinnt der. „Automatische Antwort:"/„Automatic reply:" →
+  `Posteingang/Einladungen`; `mikroforum@schoeps.de` → `❺ Ausstellung/Mikroforum
+  SCHOEPS` (Jahrgang nur ueber den Thread). **Offen:** Scanner
+  (`1og-entwicklung@`, `1og-service_support_entwicklung@`, „Attached Image",
+  75 Mails) und „Einlesen:" von `powerautomate@schoeps.de` (25, Gegenstueck zu
+  640 eigenen in Gesendet) — Zielordner fehlen. „Per E-Mail senden:" ist
+  KEINE Regel: alte Kollegen-Mails mit Anhang, thematisch verschieden.
 - **`❻ Verwaltung/Personal/Riekehof Emails` ist Altablage** (Helmut 2026-10-05:
   „darf nie Zielordner sein, ist legacy"). `index.ALTABLAGE_PFADE`: Arbeitsordner
   (nie Ziel, nie Evidenz, nicht in der KI-Ordnerliste), aber anders als ein
   Sammelordner keine Quelle des Nachziehers. 808 Mails, ueberwiegend
   Newsletter und Werkzeug-Post. Gegenprobe vorher: alle Absender darin haben
   ihre Restevidenz in einem plausiblen Ordner (Placetel, WVIB, Microsoft,
-  Redmine …). **Kandidat fuer dasselbe, nicht entschieden:**
-  `Personal/Langen Emails` (350 Mails, letzte 2023; LinkedIn zeigt ohne
-  Riekehof dorthin).
+  Redmine …). **Ebenso `Personal/Langen Emails`** (350 Mails, letzte 2023;
+  Helmut am selben Tag: „ist auch Legacy").
 - **Kein Kalenderbezug fuer Reisen** (Helmut 2026-10-05: „zu gefaehrlich").
   Nicht erneut vorschlagen.
 - **„Sei immer so spezifisch wie du sein kannst"** (Helmut 2026-10-05, zu Reisen,
@@ -754,19 +763,17 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
 - **Phase 4:** Ordnervorschlaege A–C, Slack-Push mit Link, Bestaetigungsseite
   hinter Caddy (Basic Auth), Profile editierbar, Nachzieher-Vorschlaege fuer
   Geschwister in anderen Themenordnern.
-- **`SCHOEPS intern`, zweiter Verteil-Trockenlauf (2026-10-05, ohne KI, nichts
-  bewegt):** 4.988 Mails im Ordner (+ `Done`). Nachrichtentyp vorher
-  nachgetragen: 547 Zusagen, 299 Einladungen, 105 Absagen, 11
-  Kalenderfreigaben. **1.092 gingen hart nach `Einladungen`** (Typ + „Neue
-  Buchung:"), dazu 22 per Thread → 1.114 (22 %); mit den danach ergaenzten
-  Bookings-Varianten ~1.175. **Wartet auf Helmuts Go** (`intern_verteilen.py
-  --ohne-ki --ausfuehren`). Die Thread-Stufe ist ausgeschoepft — Rest sind
-  Kollegen-Diskussionen (fleing 412, gundert 272, schaefer 249, einkauf 241 …),
-  die nur die KI oder Helmuts Hand verteilt. Weitere Kandidaten fuer feste
-  Regeln: „Automatische Antwort:" (34), „Per E-Mail senden"/„Einlesen"/
-  „Verarbeitet" (Scanner?, 50), `1og-entwicklung@` „Attached Image" (54),
-  `mikroforum@schoeps.de` (25). Der Nachzieher leert den Ordner nebenbei ueber
-  Helmuts Handablagen.
+- **`SCHOEPS intern`, zweite Verteilung (2026-10-05, ohne KI, Go Helmut):**
+  Nachrichtentyp vorher nachgetragen (547 Zusagen, 299 Einladungen, 105
+  Absagen, 11 Kalenderfreigaben). **1.250 von 4.988 bewegt, 0 Fehler:** 1.154
+  hart (Einladungstyp, Bookings), 50 Auffang (Abwesenheitsnotizen → Einladungen,
+  24 MikroForum), 45 Thread (Trockenlauf sagte 22 — bewegte Einladungen zogen
+  ihre Antworten nach), 1 Adresse. Gegengezaehlt per Graph: `SCHOEPS intern`
+  3.738, `Einladungen` 2.341, Index identisch, alle 1.250 mit `auto-*`.
+  **Rest 3.738** sind Kollegen-Diskussionen (fleing, gundert, schaefer,
+  einkauf …), die Thread und feste Regeln nicht erreichen — nur die KI oder
+  Helmuts Hand (Nachzieher). Offen: Scanner- und „Einlesen:"-Mails (~100),
+  sobald ihre Zielordner feststehen.
 - **`Move/Unbestimmt`** als KI-Warteschlange nutzen, sobald Phase 3 laeuft.
 - **Lokale Geheimnis-Dateien** `C:\PROJEKTE\graph_secret.txt` und
   `C:\PROJEKTE\Slack token.txt` liegen noch — beide stehen in der VPS-.env;
