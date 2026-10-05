@@ -97,6 +97,9 @@ pruefe(kaskade.nach_unbestimmt({"stufe": "ki", "sicherheit": "nirgends"}),
        "mit KI_SICHER_BEWEGT=0 wird `nirgends` weiter weggeraeumt")
 pruefe(kaskade.bewegt({"stufe": "thread", "ordner_id": "x"}),
        "der Schalter beruehrt Stufe 1–3 nicht")
+pruefe(not kaskade.nach_unbestimmt({"stufe": "ki", "sicherheit": "nirgends",
+                                    "bekannt": "Domain illusonic.com hat 120 abgelegte Mails"}),
+       "`nirgends` bei einem Bekannten bleibt in Move (Illusonic-Einladung, 2026-10-05)")
 kaskade.KI_SICHER_BEWEGT = True
 
 # Grobe Vorstufe im Posteingang (uninteressant.py, 2026-09-17)

@@ -104,19 +104,23 @@ async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None 
     if verdacht:
         log.info("Vorfilter haelt Mail an: %s", verdacht)
         return _unklar(f"Absender-Vorfilter: {verdacht}", kandidaten, vorfilter=True)
-    if ki_pause_h > 0:
-        alt = await letztes_ki_urteil(s, mail["id"], ki_pause_h)
-        if alt:
-            return {**alt, "kandidaten": kandidaten}
-    text_ = ""
-    if graph is not None:
-        try:
-            text_ = await graph.mail_text(mail["id"], urteil.MAX_TEXT)
-        except Exception as exc:  # noqa: BLE001 — Vorschau reicht als Rueckfall
-            log.warning("Mailtext nicht geholt (%s), nehme Vorschau", exc)
-    u = await urteil.urteile(s, mail, text_, kandidaten, ordnerliste)
+    u = await letztes_ki_urteil(s, mail["id"], ki_pause_h) if ki_pause_h > 0 else None
     if u is None:
-        return _unklar("LLM-Urteil ausgefallen", kandidaten)
+        text_ = ""
+        if graph is not None:
+            try:
+                text_ = await graph.mail_text(mail["id"], urteil.MAX_TEXT)
+            except Exception as exc:  # noqa: BLE001 — Vorschau reicht als Rueckfall
+                log.warning("Mailtext nicht geholt (%s), nehme Vorschau", exc)
+        u = await urteil.urteile(s, mail, text_, kandidaten, ordnerliste)
+        if u is None:
+            return _unklar("LLM-Urteil ausgefallen", kandidaten)
+    # `nirgends` raeumt nur Erstkontakte weg; ein Bekannter bleibt in Move.
+    # Bei jedem Lauf neu geprueft, auch fuer ein wiederverwendetes Urteil.
+    if u.get("sicherheit") == "nirgends":
+        bekannt = await absender_pruefung.bekannter_absender(s, mail, ohne_mail_id)
+        if bekannt:
+            u = {**u, "bekannt": bekannt}
     return {**u, "anteil": None, "kandidaten": kandidaten}
 
 
@@ -145,7 +149,8 @@ def nach_unbestimmt(e: dict[str, Any]) -> bool:
     fuer „kann ich selbst nicht sortieren" angelegt hat. Zwei Faelle:
 
     - der Absender-Vorfilter hat angehalten (Junk-Historie, getarnter Name),
-    - die KI sagt `nirgends` — kein bestehender Ordner passt.
+    - die KI sagt `nirgends` — kein bestehender Ordner passt — UND der Absender
+      ist ein Erstkontakt (`bekannt` leer, siehe absender_pruefung.bekannter_absender).
 
     NICHT `unsicher`: da passt das Thema, nur der Ordner ist unklar. Solche
     Mails bleiben in `Move` vor Helmuts Augen. Ebenso wenig `unklar` ohne
@@ -157,7 +162,7 @@ def nach_unbestimmt(e: dict[str, Any]) -> bool:
     """
     if e.get("vorfilter"):
         return True
-    return e["stufe"] == "ki" and e.get("sicherheit") == "nirgends"
+    return e["stufe"] == "ki" and e.get("sicherheit") == "nirgends" and not e.get("bekannt")
 
 
 async def protokolliere(s: AsyncSession, mail_id: str, e: dict[str, Any], dry_run: bool,

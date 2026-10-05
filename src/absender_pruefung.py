@@ -153,3 +153,56 @@ async def pruefe(s: AsyncSession, mail: dict[str, Any]) -> str | None:
     """Gesamturteil des Vorfilters: Grund fuer die Sperre oder None."""
     return (form_verdacht(mail.get("von_name"), mail.get("von_domain"))
             or await junk_verdacht(s, mail.get("von_adresse"), mail.get("von_domain")))
+
+
+async def bekannter_absender(s: AsyncSession, mail: dict[str, Any],
+                             ohne_mail_id: str | None = None) -> str | None:
+    """Ist der Absender ein Bekannter? Dann darf ein KI-`nirgends` die Mail NICHT
+    nach `Move/Unbestimmt` wegraeumen — sie bleibt in Move vor Helmuts Augen.
+
+    Anlass (Messung 2026-10-05, 170 abgelegte Mails, die Stufe 1–3 offen lassen):
+    Haiku sagte 7x `nirgends` zu Post, die Helmut abgelegt hatte, darunter eine
+    Einladung des Partners Illusonic und eine weitergeleitete Mail eines
+    Kollegen. Akquise ist per Definition ein Erstkontakt; dieselben Netze wie in
+    der Posteingang-Vorstufe (uninteressant.py) halten alles andere fest:
+
+    1. eigene Domain (Kollegen),
+    2. Evidenz der Adresse oder der Domain in einem Zielordner (die Domain nur,
+       wenn sie keine Anbieter-Domain ist — Freemail beweist nichts),
+    3. Helmut hat je an diese Adresse geschrieben,
+    4. Helmut hat im selben Thread geantwortet.
+
+    `ohne_mail_id` blendet eine Mail aus der Evidenz aus (Trockenlauf: sonst
+    machte die gemessene Mail ihren eigenen Absender zum Bekannten).
+    Liefert den Grund oder None.
+    """
+    from src.uninteressant import _hat_gesendet  # Netz 3 dort definiert
+    from src.regel import ist_eigene
+
+    adresse = (mail.get("von_adresse") or "").strip().lower()
+    domain = (mail.get("von_domain") or "").strip().lower()
+    if domain and ist_eigene(domain):
+        return "Absender der eigenen Domain"
+    if adresse:
+        r = await s.execute(text("""
+            SELECT (SELECT count(*) FROM mail_evidenz WHERE von_adresse = :adr
+                       AND (CAST(:ohne AS text) IS NULL OR mail_id <> CAST(:ohne AS text))),
+                   (SELECT count(*) FROM mail_evidenz WHERE von_domain = :dom
+                       AND (CAST(:ohne AS text) IS NULL OR mail_id <> CAST(:ohne AS text)))
+        """), {"adr": adresse, "dom": domain, "ohne": ohne_mail_id})
+        ev_adr, ev_dom = r.fetchone()
+        if ev_adr:
+            return f"{adresse} hat {ev_adr} abgelegte Mails"
+        if ev_dom and not ist_anbieter(domain):
+            return f"Domain {domain} hat {ev_dom} abgelegte Mails"
+        if await _hat_gesendet(s, adresse):
+            return f"an {adresse} wurde schon geschrieben"
+    if mail.get("conversation_id"):
+        r = await s.execute(text("""
+            SELECT EXISTS (
+                SELECT 1 FROM mail g JOIN ordner o ON o.id = g.ordner_id
+                 WHERE o.pfad = 'Gesendete Elemente' AND g.conversation_id = :c)
+        """), {"c": mail["conversation_id"]})
+        if r.scalar():
+            return "Thread hat eine Antwort von Helmut"
+    return None

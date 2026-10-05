@@ -74,7 +74,7 @@ async def main(n: int, monate: int, mit_ki: bool, seed: float, zeige: int, nur_k
     # `nirgends` an abgelegter Post: die Mail gehoert ja in einen Ordner. Das
     # ist der Fehler, der im halbscharfen Betrieb (KI_SICHER_BEWEGT=0) echte
     # Post nach `Move/Unbestimmt` wegraeumen wuerde.
-    verworfen: list[tuple[str, str, str]] = []
+    verworfen: list[tuple[str, str, str, str]] = []
     tokens_in = tokens_out = 0
     try:
         async with get_session() as s:
@@ -91,8 +91,9 @@ async def main(n: int, monate: int, mit_ki: bool, seed: float, zeige: int, nur_k
             if not e.get("ordner_id"):
                 je_stufe[schl]["offen"] += 1
                 if schl == "ki/nirgends":
+                    halt = f"bleibt in Move: {e['bekannt']}" if e.get("bekannt") else "→ Unbestimmt"
                     verworfen.append((m["pfad"], m.get("von_adresse") or "",
-                                      (m["betreff"] or "")[:60]))
+                                      (m["betreff"] or "")[:60], halt))
             elif e["ordner_id"] == m["ordner_id"]:
                 je_stufe[schl]["richtig"] += 1
             else:
@@ -124,8 +125,8 @@ async def main(n: int, monate: int, mit_ki: bool, seed: float, zeige: int, nur_k
         print(f"Haiku-Tokens: in={tokens_in} out={tokens_out} ≈ {kosten:.3f} USD (ohne Cache-Rabatt)")
     if verworfen:
         print(f"\nAls `nirgends` verworfen, obwohl abgelegt ({len(verworfen)}):")
-        for ist, von, betreff in verworfen:
-            print(f"  liegt in: {ist}\n      {von}  {betreff!r}")
+        for ist, von, betreff, halt in verworfen:
+            print(f"  liegt in: {ist}\n      {von}  {betreff!r}\n      {halt}")
     if fehler:
         print(f"\nFehlgriffe (max. {zeige}):")
         for schl, ist, soll, betreff in fehler[:zeige]:
