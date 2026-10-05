@@ -58,8 +58,17 @@ ARBEITS_PFADE = {
 # den Themenordner gewaehlt, die Historie sagte Sammelordner. Die Mails darin
 # werden weiter synchronisiert (fuer die Verteilung, `scripts/intern_verteilen.py`),
 # nur nicht mehr gewertet. Unterordner erben die Eigenschaft.
+#
+# Seit 2026-10-05 ebenso `Posteingang/Redmine, Planio, Slite` (Entscheidung
+# Helmut, „Sammelordner wie SCHOEPS intern"). Anlass: die KI sortierte
+# Redmine-/Slite-Post thematisch (Shaker-Software, ZIM-Projekt), die Historie
+# wollte den Sammelordner — derselbe Konflikt. Zufluss kommt weiter ueber drei
+# Outlook-Regeln (redmine@schoeps.de, hello@slite.com, PLAN.IO); was in Move
+# landet, sortiert der Worker nicht mehr dorthin.
 SAMMELORDNER_PFADE = {
-    p.strip() for p in os.getenv("SAMMELORDNER_PFADE", "Posteingang/SCHOEPS intern").split("|") if p.strip()
+    p.strip() for p in os.getenv(
+        "SAMMELORDNER_PFADE", "Posteingang/SCHOEPS intern|Posteingang/Redmine, Planio, Slite"
+    ).split("|") if p.strip()
 }
 ARBEITS_PFADE |= SAMMELORDNER_PFADE
 
