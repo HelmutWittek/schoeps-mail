@@ -513,6 +513,16 @@ keine). **Sie greifen bei der Zustellung, also vor jeder Stufe der Kaskade.**
   ihre Restevidenz in einem plausiblen Ordner (Placetel, WVIB, Microsoft,
   Redmine …). **Ebenso `Personal/Langen Emails`** (350 Mails, letzte 2023;
   Helmut am selben Tag: „ist auch Legacy").
+- **Drei feste Regeln aus der Move-Durchsicht 2026-10-08 (Go Helmut):**
+  (1) Zendesk-Kontopost per Betreff-Anfang („Schoeps Mikrofone-Passcode",
+  „API-Token für Schoeps Mikrofone", „Ihr Schoeps Mikrofone-Kennwort") →
+  `Posteingang/Zendesk`; (1b) `sales@`/`support@schoeps.de` NUR mit genau dem
+  Anzeigenamen „Schoeps Mikrofone Sales" bzw. „… - Support" (ohne Agent: 69 von
+  73 in Zendesk) → Zendesk — mit Agentennamen („Frank Herzog (Schoeps Mikrofone
+  Sales)") nur 77 %, das bleibt Statistik/KI; neues Regelfeld `absender_namen`,
+  der Anzeigename wird dafuer durch die Kaskade gereicht; (2) `google_konto`:
+  `no-reply@accounts.google.com`, `googleworkspace-noreply@google.com` →
+  `❻ …/Google`. Erster Zyklus: Passcode-Mail hart nach Zendesk.
 - **Kein Kalenderbezug fuer Reisen** (Helmut 2026-10-05: „zu gefaehrlich").
   Nicht erneut vorschlagen.
 - **„Sei immer so spezifisch wie du sein kannst"** (Helmut 2026-10-05, zu Reisen,
@@ -842,7 +852,7 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   mit Textlaenge/-anfang geloggt); Haiku erfindet gelegentlich Pfade (wird als
   unsicher verworfen — oder, wenn nur die Bereichsmarke fehlt, ueber
   `urteil.normpfad()` doch zugeordnet). Automatische Tests sind
-  `test_regel.py` (63), `test_absender_pruefung.py` (57) und `test_db.py` (21,
+  `test_regel.py` (73), `test_absender_pruefung.py` (57) und `test_db.py` (24,
   DB in zurueckgerollter Transaktion, seit 2026-10-05).
 
 ## Phasen
@@ -856,8 +866,8 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
 | 4 | Vorschlaege A–C, Slack-Push, Bestaetigungsseite, Profile editierbar, Nachzieher-Vorschlaege fuer andere Themenordner | offen |
 | 5 | Alarme vervollstaendigen, Doku, DB-Tests | teils: Heartbeat, Slack-Alarm, Pfad-Waechter (Regelziele, Sonderpfade), DB-Tests seit 2026-10-05 |
 
-Tests: `scripts/test_regel.py` (63) und `scripts/test_absender_pruefung.py` (57)
-ohne DB, dazu **`scripts/test_db.py` (21, seit 2026-10-05)** gegen die echte DB:
+Tests: `scripts/test_regel.py` (73) und `scripts/test_absender_pruefung.py` (57)
+ohne DB, dazu **`scripts/test_db.py` (24, seit 2026-10-05)** gegen die echte DB:
 alles in EINER Transaktion, die zurueckgerollt wird (`get_session()` auf eine
 Verbindung mit Savepoints umgebogen), Graph als Attrappe — der laufende Worker
 sieht keine Testzeile, eine zweite Verbindung prueft am Ende, dass nichts
