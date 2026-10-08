@@ -76,10 +76,10 @@ def jetzt() -> str:
 
 
 def graph_mail(mid: str, ordner: str, conv: str, adresse: str, betreff: str,
-               typ: str | None = None) -> dict[str, Any]:
+               typ: str | None = None, name: str = "ZZTEST") -> dict[str, Any]:
     m = {"id": mid, "parentFolderId": ordner, "conversationId": conv,
          "internetMessageId": f"<{mid}@zztest.invalid>",
-         "from": {"emailAddress": {"address": adresse, "name": "ZZTEST"}},
+         "from": {"emailAddress": {"address": adresse, "name": name}},
          "toRecipients": [], "subject": betreff, "bodyPreview": "",
          "receivedDateTime": jetzt(), "sentDateTime": jetzt(), "categories": []}
     if typ:
@@ -101,6 +101,8 @@ async def tests() -> None:
     move = await ordner_id(sortierer.MOVE_PFAD)
     einladungen = await ordner_id("Posteingang/Einladungen")
     redmine = await ordner_id("Posteingang/Redmine, Planio, Slite, Scanner")
+    zendesk = await ordner_id("Posteingang/Zendesk")
+    google = await ordner_id("❻ Verwaltung/Hardware, Software, Netzwerk/Google")
 
     # Testordner: ein Zielordner und eine Quelle fuer den OOF-Nachtrag
     async with db.get_session() as s:
@@ -152,6 +154,16 @@ async def tests() -> None:
     e = await kaskade_fuer(graph_mail("ZZTEST-E3", move, "ZZTEST-CONV-E3", "zztest9@zztest.invalid",
                                       "Neue Buchung: ZZTEST"))
     pruefe(e["stufe"] == "hart" and e["ordner_id"] == einladungen, "Bookings-Betreff → hart Einladungen")
+    # Anzeigename muss durch die ganze Kaskade bis zur harten Ablage kommen (2026-10-08)
+    e = await kaskade_fuer(graph_mail("ZZTEST-E8", move, "ZZTEST-CONV-E8", "sales@schoeps.de",
+                                      "ZZTEST Bestellung", name="Schoeps Mikrofone Sales"))
+    pruefe(e["stufe"] == "hart" and e["ordner_id"] == zendesk, "sales@ ohne Agent → hart Zendesk")
+    e = await kaskade_fuer(graph_mail("ZZTEST-E9", move, "ZZTEST-CONV-E9", "sales@schoeps.de",
+                                      "ZZTEST Bestellung", name="ZZTEST Agent (Schoeps Mikrofone Sales)"))
+    pruefe(e["stufe"] != "hart", "sales@ mit Agent → nicht hart")
+    e = await kaskade_fuer(graph_mail("ZZTEST-E10", move, "ZZTEST-CONV-E10", "no-reply@accounts.google.com",
+                                      "Sicherheitswarnung"))
+    pruefe(e["stufe"] == "hart" and e["ordner_id"] == google, "Google-Kontowarnung → hart Google")
 
     # --- Stufe 2 vor Auffang; Auffang nur ohne Thread
     e = await kaskade_fuer(graph_mail("ZZTEST-E4", move, "ZZTEST-CONV-2", "kollege@schoeps.de",

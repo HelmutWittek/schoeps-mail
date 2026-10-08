@@ -139,8 +139,34 @@ pruefe(regel.harte_ablage("schoeps.de", "Attached Image", None, "1OG-Entwicklung
        "Scanner → Redmine, Planio, Slite, Scanner")
 pruefe(regel.harte_ablage("schoeps.de", "Einlesen: 540-1971.pdf", None, "PowerAutomate@schoeps.de")["name"]
        == "powerautomate", "Power Automate → Microsoft")
-pruefe(regel.harte_ablage("google.com", "Sicherheitswarnung", None, "no-reply@accounts.google.com") is None,
+pruefe(regel.harte_ablage("google.com", "Kalender", None, "calendar-notification@google.com") is None,
        "andere Google-Adresse trifft nicht")
+
+# Feste Regeln aus der Move-Durchsicht (2026-10-08)
+pruefe(regel.harte_ablage("accounts.google.com", "Sicherheitswarnung", None,
+                          "no-reply@accounts.google.com")["name"] == "google_konto", "Google-Kontowarnung → Google")
+pruefe(regel.harte_ablage("google.com", "Nicht vergessen", None,
+                          "googleworkspace-noreply@google.com")["name"] == "google_konto", "Workspace-Hinweis → Google")
+pruefe(regel.harte_ablage("schoeps.de", "Schoeps Mikrofone-Passcode zur Verifizierung", None,
+                          "support@schoeps.de")["name"] == "zendesk", "Zendesk-Passcode → Zendesk")
+pruefe(regel.harte_ablage("schoeps.de", "API-Token für Schoeps Mikrofone werden in Kürze deaktiviert")["name"]
+       == "zendesk", "Zendesk-API-Token → Zendesk")
+pruefe(regel.harte_ablage("schoeps.de", "Ihr Schoeps Mikrofone-Kennwort läuft in 4 Tagen ab")["name"]
+       == "zendesk", "Zendesk-Kennwort → Zendesk")
+pruefe(regel.harte_ablage("schoeps.de", "Bestellung", None, "Sales@schoeps.de",
+                          von_name=" Schoeps Mikrofone Sales ")["name"] == "zendesk",
+       "sales@ ohne Agentennamen → Zendesk")
+pruefe(regel.harte_ablage("schoeps.de", "Kabel", None, "support@schoeps.de",
+                          von_name="Schoeps Mikrofone - Support")["name"] == "zendesk",
+       "support@ ohne Agentennamen → Zendesk")
+pruefe(regel.harte_ablage("schoeps.de", "Bestellung", None, "sales@schoeps.de",
+                          von_name="Frank Herzog (Schoeps Mikrofone Sales)") is None,
+       "sales@ MIT Agentennamen trifft NICHT (bleibt Statistik)")
+pruefe(regel.harte_ablage("schoeps.de", "Bestellung", None, "wittek@schoeps.de",
+                          von_name="Schoeps Mikrofone Sales") is None,
+       "Name allein ohne passende Adresse trifft nicht")
+pruefe(regel.harte_ablage("schoeps.de", "Bestellung", None, "sales@schoeps.de") is None,
+       "sales@ ohne Namen trifft nicht")
 pruefe(regel.harte_ablage("sennheiser.com", None) is None, "Wettbewerber trifft nicht")
 pruefe(kaskade.bewegt({"stufe": "hart", "ordner_id": "x"}), "harte Ablage bewegt")
 pruefe(kaskade.kategorie({"stufe": "hart"}) == "auto-regel", "harte Ablage bekommt auto-regel")

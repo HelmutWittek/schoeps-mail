@@ -226,6 +226,16 @@ HARTE_ABLAGE: list[dict[str, Any]] = [
             t.strip().lower() for t in os.getenv("ZENDESK_MARKEN", "[Schoeps Mikrofone]").split("|")
             if t.strip()
         ),
+        # Kontopost von Zendesk selbst (Move-Durchsicht 2026-10-08, Go Helmut):
+        # traegt weder Marke noch zendesk.com-Absender.
+        "betreff_anfaenge": ("schoeps mikrofone-passcode", "api-token für schoeps mikrofone",
+                             "ihr schoeps mikrofone-kennwort"),
+        # Zendesk schreibt als sales@/support@schoeps.de. Der Anzeigename traegt
+        # dann den Agenten („Frank Herzog (Schoeps Mikrofone Sales)") — solche
+        # Mails legt Helmut oft thematisch ab (nur 77 % in Zendesk), sie bleiben
+        # der Statistik. OHNE Agent (genau dieser Name) sind es 69 von 73.
+        "absender_namen": (("sales@schoeps.de", "schoeps mikrofone sales"),
+                           ("support@schoeps.de", "schoeps mikrofone - support")),
     },
     # Einladungen, Zusagen, Absagen (Helmut 2026-10-05). Neue Einladungen
     # bleiben bewusst im Posteingang (keine Outlook-Regel), damit er sie
@@ -289,6 +299,15 @@ HARTE_ABLAGE: list[dict[str, Any]] = [
         "marken": (),
         "adressen": ("powerautomate@schoeps.de",),
     },
+    # Google-Kontowarnungen (Move-Durchsicht 2026-10-08, Go Helmut). Nur diese
+    # Adressen: unter google.com kommt auch Telefon- und Apps-Script-Post.
+    {
+        "name": "google_konto",
+        "pfad": os.getenv("GOOGLE_PFAD", "❻ Verwaltung/Hardware, Software, Netzwerk/Google"),
+        "domains": (),
+        "marken": (),
+        "adressen": ("no-reply@accounts.google.com", "googleworkspace-noreply@google.com"),
+    },
 ]
 
 # Auffang-Regeln: wie die harte Ablage, aber erst NACH Stufe 1 und 2 — „wenn
@@ -316,11 +335,13 @@ AUFFANG_ABLAGE: list[dict[str, Any]] = [
 def harte_ablage(von_domain: str | None, betreff: str | None,
                  nachrichtentyp: str | None = None,
                  von_adresse: str | None = None,
-                 liste: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
+                 liste: list[dict[str, Any]] | None = None,
+                 von_name: str | None = None) -> dict[str, Any] | None:
     """Greift eine feste Regel (Default: HARTE_ABLAGE)? Reine Logik, liefert sie oder None."""
     kand = domain_kandidaten(von_domain or "")
     tag = betreff_tag(betreff)
     adresse = (von_adresse or "").strip().lower()
+    name = (von_name or "").strip().lower()
     betreff_klein = (betreff or "").strip().lower()
     for regel in (HARTE_ABLAGE if liste is None else liste):
         praefix = regel.get("typ_praefix")
@@ -328,6 +349,8 @@ def harte_ablage(von_domain: str | None, betreff: str | None,
             return {**regel, "grund": f"Nachrichtentyp {nachrichtentyp}"}
         if adresse and adresse in regel.get("adressen", ()):
             return {**regel, "grund": f"Absender {adresse}"}
+        if adresse and (adresse, name) in regel.get("absender_namen", ()):
+            return {**regel, "grund": f"Absender {von_name} <{adresse}>"}
         if any(d in kand for d in regel["domains"]):
             return {**regel, "grund": f"Absender-Domain {von_domain}"}
         if tag and tag in regel["marken"]:
@@ -341,7 +364,8 @@ def harte_ablage(von_domain: str | None, betreff: str | None,
 async def nach_harter_ablage(s: AsyncSession, von_domain: str | None, betreff: str | None,
                              nachrichtentyp: str | None = None,
                              von_adresse: str | None = None,
-                             auffang: bool = False) -> dict[str, Any] | None:
+                             auffang: bool = False,
+                             von_name: str | None = None) -> dict[str, Any] | None:
     """Stufe 0 (oder mit `auffang` die Auffang-Regeln nach Stufe 2): feste Regel
     erkannt -> fester Zielordner, ohne Statistik.
 
@@ -349,7 +373,7 @@ async def nach_harter_ablage(s: AsyncSession, von_domain: str | None, betreff: s
     laeuft normal weiter — nie raten, nie einen Ordner erfinden.
     """
     treffer = harte_ablage(von_domain, betreff, nachrichtentyp, von_adresse,
-                           AUFFANG_ABLAGE if auffang else None)
+                           AUFFANG_ABLAGE if auffang else None, von_name)
     if not treffer:
         return None
     r = await s.execute(text("SELECT id FROM ordner WHERE pfad = :p AND verschwunden_am IS NULL"),
@@ -467,7 +491,8 @@ async def nach_domain(s: AsyncSession, domain: str, ohne_mail_id: str | None = N
 
 async def entscheide_statistik(s: AsyncSession, von_adresse: str | None, von_domain: str | None,
                                ohne_mail_id: str | None = None, betreff: str | None = None,
-                               nachrichtentyp: str | None = None) -> dict[str, Any] | None:
+                               nachrichtentyp: str | None = None,
+                               von_name: str | None = None) -> dict[str, Any] | None:
     """Stufe 0 und 1: harte Ablage, dann Adresse, Betreff-Marke, Domain.
 
     Die harte Ablage (Ticket-Systeme) laeuft VOR allem anderen und kennt keine
@@ -476,7 +501,7 @@ async def entscheide_statistik(s: AsyncSession, von_adresse: str | None, von_dom
     Eigene Domains: nur die strenge Adress-Regel (Systemadressen) und die
     Betreff-Marke — nie die Domain, nie die lockere Adress-Statistik.
     """
-    t = await nach_harter_ablage(s, von_domain, betreff, nachrichtentyp, von_adresse)
+    t = await nach_harter_ablage(s, von_domain, betreff, nachrichtentyp, von_adresse, von_name=von_name)
     if t:
         return t
     if not von_adresse:

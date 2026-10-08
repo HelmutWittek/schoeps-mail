@@ -82,7 +82,8 @@ async def entscheide(s: AsyncSession, mail: dict[str, Any], graph: Graph | None 
     # Stufe 1
     t = await regel.entscheide_statistik(s, mail.get("von_adresse"), mail.get("von_domain"),
                                          ohne_mail_id, betreff=mail.get("betreff"),
-                                         nachrichtentyp=mail.get("nachrichtentyp"))
+                                         nachrichtentyp=mail.get("nachrichtentyp"),
+                                         von_name=mail.get("von_name"))
     if t:
         return {**t, "sicherheit": "sicher", "kandidaten": []}
 
