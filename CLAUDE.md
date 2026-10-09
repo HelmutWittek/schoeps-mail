@@ -200,6 +200,20 @@ Datenhaltung durch Helmut am 2026-09-14** (siehe Entscheidungen).
   `MailboxSettings.ReadWrite` (mit `Mail.ReadWrite` allein: 403), Zuweisen an
   Mails nicht. Ordnernamen enthalten `❶…❾` — Konsole/Logs auf UTF-8
   (`PYTHONUTF8=1`), sonst `UnicodeEncodeError` beim ersten Ordnerbaum.
+- **Delta-Geruest (gefunden 2026-10-08):** eine GEAENDERTE Mail (gelesen/
+  ungelesen, Kategorie) kommt im Delta nur als `@odata.type`, `id`,
+  `parentFolderId` und das geaenderte Feld — kein Betreff, Absender, Datum,
+  Thread (Rohdaten per isRead-Umschalten bestaetigt). Der Upsert schrieb das
+  bis dahin als NULL ueber den Bestand: **2.475 leere Zeilen**, 2.379 davon im
+  Redmine-Ordner, nachdem Helmut ihn am 05.10. als gelesen markiert hatte.
+  Schaden: Stufe 1–3 sahen den Absender nicht, und `bekannter_absender` hielt
+  `ping@klingklangklong.com` (Evidenz in 3 Zielordnern) fuer einen
+  Erstkontakt — KI-`nirgends` raeumte die Mail am 07.10. nach `Unbestimmt`.
+  Seitdem: `index.ist_geruest` → nur mitgelieferte Felder schreiben; ist die
+  Zeile unbekannt oder leer, Einzelabruf `graph.mail_metadaten` (liefert auch
+  den Nachrichtentyp). Netz 0 in `bekannter_absender`: ohne Adresse kein
+  Erstkontakt, nichts wird weggeraeumt. Bestand per
+  `scripts/geruest_nachtragen.py` gefuellt (2.484, 0 uebrig).
 - **Graph-Luecke Abwesenheitsnotizen (gefunden 2026-10-05):** OOF-Antworten von
   Kollegen im eigenen Tenant (Klasse `IPM.Note.Rules.OofTemplate.Microsoft`)
   liefert Graph **weder im Delta noch in der Ordnerliste** — nur `$search`
@@ -852,7 +866,7 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
   mit Textlaenge/-anfang geloggt); Haiku erfindet gelegentlich Pfade (wird als
   unsicher verworfen — oder, wenn nur die Bereichsmarke fehlt, ueber
   `urteil.normpfad()` doch zugeordnet). Automatische Tests sind
-  `test_regel.py` (73), `test_absender_pruefung.py` (57) und `test_db.py` (24,
+  `test_regel.py` (73), `test_absender_pruefung.py` (57) und `test_db.py` (29,
   DB in zurueckgerollter Transaktion, seit 2026-10-05).
 
 ## Phasen
@@ -867,7 +881,7 @@ Absenderadresse eine Akte erzeugt hat. Frage: kann das hier auch passieren?
 | 5 | Alarme vervollstaendigen, Doku, DB-Tests | teils: Heartbeat, Slack-Alarm, Pfad-Waechter (Regelziele, Sonderpfade), DB-Tests seit 2026-10-05 |
 
 Tests: `scripts/test_regel.py` (73) und `scripts/test_absender_pruefung.py` (57)
-ohne DB, dazu **`scripts/test_db.py` (24, seit 2026-10-05)** gegen die echte DB:
+ohne DB, dazu **`scripts/test_db.py` (29, seit 2026-10-05)** gegen die echte DB:
 alles in EINER Transaktion, die zurueckgerollt wird (`get_session()` auf eine
 Verbindung mit Savepoints umgebogen), Graph als Attrappe — der laufende Worker
 sieht keine Testzeile, eine zweite Verbindung prueft am Ende, dass nichts
@@ -893,6 +907,9 @@ nur eigene Spuren, ein Lauf mit gestelltem Urteil wird auf die Testdaten begrenz
 - `nachrichtentyp_nachtragen.py [--ordner PFAD …]` — Nachrichtentyp (Migration 006)
   fuer schon indizierte Mails nachtragen, frisches Delta ohne den gespeicherten
   Link; Default `Posteingang/Move` und `Posteingang`.
+- `geruest_nachtragen.py [--limit N] [--ausfuehren]` — leere Indexzeilen (Delta-Geruest)
+  per Einzelabruf fuellen, Ordner bleibt unberuehrt; Trockenlauf als Default.
+  Gelaufen 2026-10-09: 2.484 gefuellt, 0 leer uebrig.
 - `test_regel.py` — Logik-Tests ohne DB (46 Pruefungen, inkl. harte Ablage und Einladungen).
 - `test_absender_pruefung.py` — Vorfilter, `ziel_leer`, `nach_unbestimmt`, `normpfad`, halbscharf (57 Pruefungen ohne DB).
 - `trockenlauf.py` listet seit 2026-10-05 auch `nirgends`-Urteile an abgelegter
