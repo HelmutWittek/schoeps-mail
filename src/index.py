@@ -30,7 +30,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import get_session
-from src.graph import Graph
+from src.graph import Graph, GraphFehler
 
 log = logging.getLogger("schoepsmail.index")
 
@@ -119,6 +119,20 @@ def nachrichtentyp(m: dict[str, Any]) -> str | None:
     """
     typ = (m.get("@odata.type") or "").rsplit(".", 1)[-1]
     return None if typ in ("", "message") else typ
+
+
+def ist_geruest(m: dict[str, Any]) -> bool:
+    """Ist der Delta-Eintrag nur ein Geruest?
+
+    Graph meldet eine GEAENDERTE Mail (gelesen, Kategorie) im Delta nur mit
+    `id`, `parentFolderId`, `@odata.type` und dem geaenderten Feld (Rohdaten
+    2026-10-08). Bis dahin schrieb der Upsert das als NULL ueber die vorhandenen
+    Werte: 2.475 Zeilen ohne Absender, Betreff, Datum und Thread, darunter
+    2.379 im Redmine-Ordner, nachdem Helmut ihn am 05.10. als gelesen markiert
+    hatte. Folge: Stufe 1–3 sahen den Absender nicht, und das Bekannten-Netz
+    hielt einen Newsletter-Absender mit Evidenz fuer einen Erstkontakt.
+    """
+    return "subject" not in m and "receivedDateTime" not in m
 
 
 def _mail_zeile(m: dict[str, Any]) -> dict[str, Any]:
@@ -223,7 +237,15 @@ async def spiegle_ordner(graph: Graph) -> dict[str, dict[str, Any]]:
 
 
 # --------------------------------------------------------------------- Mails
-async def _schreibe_seite(s: AsyncSession, ordner_id: str, eintraege: list[dict[str, Any]]) -> tuple[int, int]:
+async def _schreibe_seite(s: AsyncSession, ordner_id: str, eintraege: list[dict[str, Any]],
+                          graph: Graph | None = None) -> tuple[int, int]:
+    """Delta-Eintraege in `mail` schreiben. Liefert (geschrieben, entfernt).
+
+    Ein Geruest-Eintrag (`ist_geruest`) ueberschreibt nie vorhandene Werte. Ist
+    die Zeile unbekannt oder selbst leer, wird die Mail mit `graph` einzeln
+    geholt; ohne `graph` oder wenn der Abruf scheitert, werden nur die
+    mitgelieferten Felder geschrieben.
+    """
     neu_oder_geaendert = 0
     entfernt = 0
     for m in eintraege:
@@ -234,6 +256,22 @@ async def _schreibe_seite(s: AsyncSession, ordner_id: str, eintraege: list[dict[
             """), {"id": m["id"], "ordner": ordner_id})
             entfernt += r.rowcount or 0
             continue
+        r = await s.execute(text("SELECT ordner_id, empfangen_am IS NOT NULL FROM mail WHERE id = :id"),
+                            {"id": m["id"]})
+        row = r.fetchone()
+        alt, alt_voll = (row[0], row[1]) if row else (None, False)
+        teil = ist_geruest(m)
+        if teil and not alt_voll and graph is not None:
+            try:
+                m = await graph.mail_metadaten(m["id"])
+                teil = ist_geruest(m)
+            except GraphFehler as exc:
+                if exc.status == 404:
+                    # Inzwischen geloescht oder verschoben — das @removed folgt.
+                    log.info("Geruest %s: Mail nicht mehr da, uebersprungen", m["id"][-16:])
+                    continue
+                log.warning("Geruest %s: Einzelabruf gescheitert (%s), schreibe nur Teilfelder",
+                            m["id"][-16:], exc)
         z = _mail_zeile(m)
         if not z["ordner_id"]:
             z["ordner_id"] = ordner_id
@@ -241,13 +279,27 @@ async def _schreibe_seite(s: AsyncSession, ordner_id: str, eintraege: list[dict[
         # ANDEREN Ordner, hat sie jemand verschoben. Der Worker traegt seine
         # eigenen Moves sofort in `mail` ein (sortierer.verschiebe) — was hier
         # als Wechsel ankommt, ist also Helmuts Hand (oder eine Client-Regel).
-        r = await s.execute(text("SELECT ordner_id FROM mail WHERE id = :id"), {"id": z["id"]})
-        alt = r.scalar()
         if alt is not None and alt != z["ordner_id"]:
             await s.execute(text("""
                 INSERT INTO mail_bewegung (mail_id, von_ordner_id, nach_ordner_id, quelle)
                 VALUES (:m, :von, :nach, 'hand')
             """), {"m": z["id"], "von": alt, "nach": z["ordner_id"]})
+        if teil:
+            # Nur, was der Eintrag wirklich traegt; alles andere bleibt.
+            await s.execute(text("""
+                INSERT INTO mail (id, ordner_id, ist_gelesen, kategorien, entfernt_am,
+                                  gesehen_am, aktualisiert_am)
+                VALUES (:id, :ordner_id, :ist_gelesen, COALESCE(CAST(:kategorien AS text[]), '{}'),
+                        NULL, now(), now())
+                ON CONFLICT (id) DO UPDATE SET
+                    ordner_id = EXCLUDED.ordner_id,
+                    ist_gelesen = COALESCE(EXCLUDED.ist_gelesen, mail.ist_gelesen),
+                    kategorien = COALESCE(CAST(:kategorien AS text[]), mail.kategorien),
+                    entfernt_am = NULL, aktualisiert_am = now()
+            """), {"id": z["id"], "ordner_id": z["ordner_id"], "ist_gelesen": m.get("isRead"),
+                   "kategorien": list(m["categories"]) if "categories" in m else None})
+            neu_oder_geaendert += 1
+            continue
         await s.execute(text("""
             INSERT INTO mail (id, ordner_id, conversation_id, internet_message_id,
                               von_adresse, von_name, von_domain, an, betreff, vorschau,
@@ -282,7 +334,7 @@ async def sync_ordner(graph: Graph, ordner_id: str, pfad: str) -> tuple[int, int
     async for eintraege, fertig in graph.delta_seiten(ordner_id, delta_link):
         seiten += 1
         async with get_session() as s:
-            n, w = await _schreibe_seite(s, ordner_id, eintraege)
+            n, w = await _schreibe_seite(s, ordner_id, eintraege, graph)
             gesamt_neu += n
             gesamt_weg += w
             if fertig:

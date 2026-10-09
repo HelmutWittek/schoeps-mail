@@ -11,7 +11,9 @@ Was man wissen muss, bevor man hier etwas aendert:
 - Delta je Ordner (`/mailFolders/<id>/messages/delta`): der erste Lauf liefert
   alles seitenweise, der Delta-Link am Ende merkt sich den Stand. Entfernte
   Mails kommen als `@removed`. Verschobene erscheinen als entfernt im alten und
-  als neu im neuen Ordner.
+  als neu im neuen Ordner. **Geaenderte** Mails (gelesen/ungelesen, Kategorie)
+  kommen dagegen nur als Geruest: `id`, `parentFolderId`, `@odata.type` und das
+  geaenderte Feld — kein Betreff, kein Absender (gemessen 2026-10-08).
 - 429/503 mit `Retry-After` werden abgewartet, sonst nichts wiederholt, was
   schreibt (ein Move darf nicht zweimal laufen).
 """
@@ -243,6 +245,13 @@ class Graph:
                                 prefer='outlook.body-content-type="text"')
         text = ((d.get("body") or {}).get("content") or "").replace("\x00", "")
         return text[:max_zeichen]
+
+    async def mail_metadaten(self, mail_id: str) -> dict[str, Any]:
+        """Eine Mail mit denselben Feldern wie im Delta (`MAIL_FELDER`).
+
+        Fuer Delta-Eintraege, die nur ein Geruest sind (siehe index.ist_geruest).
+        """
+        return await self.get(f"/messages/{mail_id}", **{"$select": MAIL_FELDER})
 
     async def mail_header(self, mail_id: str) -> list[dict[str, str]]:
         d = await self._anfrage("GET", f"/messages/{mail_id}",

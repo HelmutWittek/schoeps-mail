@@ -49,6 +49,14 @@ class GraphAttrappe:
     def __init__(self) -> None:
         self.aufrufe: list[tuple[str, str, Any]] = []
         self.oof_treffer: list[dict[str, Any]] = []
+        self.metadaten: dict[str, dict[str, Any]] = {}
+
+    async def mail_metadaten(self, mail_id: str) -> dict[str, Any]:
+        self.aufrufe.append(("metadaten", mail_id, None))
+        if mail_id not in self.metadaten:
+            from src.graph import GraphFehler
+            raise GraphFehler(404, "ErrorItemNotFound", f"/messages/{mail_id}")
+        return self.metadaten[mail_id]
 
     async def verschiebe(self, mail_id: str, ziel: str) -> dict[str, Any]:
         self.aufrufe.append(("verschiebe", mail_id, ziel))
@@ -96,7 +104,7 @@ async def ordner_id(pfad: str) -> str:
 
 
 async def tests() -> None:
-    from src import index, kaskade, konversation, nachzieher, oof_nachtrag, regel, sortierer
+    from src import absender_pruefung, index, kaskade, konversation, nachzieher, oof_nachtrag, regel, sortierer
 
     move = await ordner_id(sortierer.MOVE_PFAD)
     einladungen = await ordner_id("Posteingang/Einladungen")
@@ -235,6 +243,41 @@ async def tests() -> None:
     async with db.get_session() as s:
         weg = (await s.execute(text("SELECT entfernt_am IS NOT NULL FROM mail WHERE id='ZZTEST-OOF1'"))).scalar()
     pruefe(z["entfernt"] == 1 and bool(weg), "nicht mehr gefundene OOF-Notiz gilt als entfernt")
+
+    # --- Delta-Geruest (2026-10-08): Graph meldet eine gelesene Mail nur mit
+    # id, parentFolderId, @odata.type und isRead — das darf nichts ueberschreiben.
+    def geruest(mid: str, ordner: str, **felder: Any) -> dict[str, Any]:
+        return {"@odata.type": "#microsoft.graph.message", "id": mid, "parentFolderId": ordner, **felder}
+
+    g = GraphAttrappe()
+    async with db.get_session() as s:
+        await index._schreibe_seite(s, "ZZTEST-ZIEL", [graph_mail(
+            "ZZTEST-G1", "ZZTEST-ZIEL", "ZZTEST-CONV-G1", "zztest-g@zztest.invalid", "ZZTEST Geruest")])
+        await index._schreibe_seite(s, "ZZTEST-ZIEL", [geruest("ZZTEST-G1", "ZZTEST-ZIEL", isRead=True)], g)
+        z = (await s.execute(text("""
+            SELECT von_adresse, betreff, conversation_id, empfangen_am IS NOT NULL, ist_gelesen
+              FROM mail WHERE id = 'ZZTEST-G1'"""))).fetchone()
+    pruefe(tuple(z) == ("zztest-g@zztest.invalid", "ZZTEST Geruest", "ZZTEST-CONV-G1", True, True),
+           "Geruest ueberschreibt nichts, uebernimmt nur isRead")
+    pruefe(g.aufrufe == [], "… und braucht fuer eine volle Zeile keinen Einzelabruf")
+
+    g = GraphAttrappe()
+    g.metadaten["ZZTEST-G2"] = graph_mail("ZZTEST-G2", "ZZTEST-ZIEL", "ZZTEST-CONV-G2",
+                                          "zztest-g2@zztest.invalid", "ZZTEST Unbekannt")
+    async with db.get_session() as s:
+        await index._schreibe_seite(s, "ZZTEST-ZIEL", [geruest("ZZTEST-G2", "ZZTEST-ZIEL", isRead=False),
+                                                       geruest("ZZTEST-G3", "ZZTEST-ZIEL", isRead=False)], g)
+        z2 = (await s.execute(text("SELECT von_adresse, betreff FROM mail WHERE id = 'ZZTEST-G2'"))).fetchone()
+        n3 = (await s.execute(text("SELECT count(*) FROM mail WHERE id = 'ZZTEST-G3'"))).scalar()
+    pruefe(tuple(z2) == ("zztest-g2@zztest.invalid", "ZZTEST Unbekannt"),
+           "Geruest einer unbekannten Mail wird per Einzelabruf vollstaendig geholt")
+    pruefe(n3 == 0, "Geruest einer verschwundenen Mail (404) wird uebersprungen")
+
+    # Netz 0: ohne Absender ist niemand ein Erstkontakt
+    async with db.get_session() as s:
+        b = await absender_pruefung.bekannter_absender(s, {"id": "ZZTEST-X", "von_adresse": None})
+    e = {"stufe": "ki", "sicherheit": "nirgends", "bekannt": b}
+    pruefe(bool(b) and not kaskade.nach_unbestimmt(e), "KI-nirgends ohne Absender raeumt NICHT nach Unbestimmt")
 
 
 async def main() -> int:

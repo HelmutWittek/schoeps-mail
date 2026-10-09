@@ -181,22 +181,26 @@ async def bekannter_absender(s: AsyncSession, mail: dict[str, Any],
 
     adresse = (mail.get("von_adresse") or "").strip().lower()
     domain = (mail.get("von_domain") or "").strip().lower()
+    # Netz 0 (2026-10-08): ohne Absender kein Urteil „Erstkontakt". Eine leere
+    # Indexzeile (Delta-Geruest, siehe index.ist_geruest) hat am 07.10. einen
+    # Newsletter mit Evidenz in drei Zielordnern nach Unbestimmt geraeumt.
+    if not adresse:
+        return "Absender im Index unbekannt"
     if domain and ist_eigene(domain):
         return "Absender der eigenen Domain"
-    if adresse:
-        r = await s.execute(text("""
-            SELECT (SELECT count(*) FROM mail_evidenz WHERE von_adresse = :adr
-                       AND (CAST(:ohne AS text) IS NULL OR mail_id <> CAST(:ohne AS text))),
-                   (SELECT count(*) FROM mail_evidenz WHERE von_domain = :dom
-                       AND (CAST(:ohne AS text) IS NULL OR mail_id <> CAST(:ohne AS text)))
-        """), {"adr": adresse, "dom": domain, "ohne": ohne_mail_id})
-        ev_adr, ev_dom = r.fetchone()
-        if ev_adr:
-            return f"{adresse} hat {ev_adr} abgelegte Mails"
-        if ev_dom and not ist_anbieter(domain):
-            return f"Domain {domain} hat {ev_dom} abgelegte Mails"
-        if await _hat_gesendet(s, adresse):
-            return f"an {adresse} wurde schon geschrieben"
+    r = await s.execute(text("""
+        SELECT (SELECT count(*) FROM mail_evidenz WHERE von_adresse = :adr
+                   AND (CAST(:ohne AS text) IS NULL OR mail_id <> CAST(:ohne AS text))),
+               (SELECT count(*) FROM mail_evidenz WHERE von_domain = :dom
+                   AND (CAST(:ohne AS text) IS NULL OR mail_id <> CAST(:ohne AS text)))
+    """), {"adr": adresse, "dom": domain, "ohne": ohne_mail_id})
+    ev_adr, ev_dom = r.fetchone()
+    if ev_adr:
+        return f"{adresse} hat {ev_adr} abgelegte Mails"
+    if ev_dom and not ist_anbieter(domain):
+        return f"Domain {domain} hat {ev_dom} abgelegte Mails"
+    if await _hat_gesendet(s, adresse):
+        return f"an {adresse} wurde schon geschrieben"
     if mail.get("conversation_id"):
         r = await s.execute(text("""
             SELECT EXISTS (
